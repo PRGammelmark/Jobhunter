@@ -1,9 +1,11 @@
+import type { Types } from 'mongoose';
 import OpenAI from 'openai';
 import { config } from '../../config';
 import { CvTemplate, KnowledgeEntry } from '../../models';
 import { storageService } from '../storage/storageService';
 import { extractTextFromBuffer } from '../cv/cvTextExtractor';
 import {
+  composeAiPrompt,
   normalizeSkillConfidence,
   type CvKnowledgeExtractionResult,
   type EmploymentDetails,
@@ -11,6 +13,48 @@ import {
   type KnowledgeEntryDraft,
   type KnowledgeEntryType,
 } from '@career-intelligence/shared';
+
+const CV_KNOWLEDGE_EXTRACTION_INSTRUCTIONS = `Du udtrækker strukturerede datapunkter fra CV'er til en Knowledge Base til jobansøgninger.
+
+Opgave:
+1. Identificér ansættelser, uddannelser, kompetencer, projekter, resultater og relevante historier.
+2. Strukturér hvert datapunkt som en Knowledge Base-entry.
+3. UDELAD alt der allerede findes i knowledge base (samme ansættelse/virksomhed+rolle, samme uddannelse, samme kompetence/projekt osv.).
+4. Udelad personlige kontaktoplysninger (adresse, telefon, email) som egne entries.
+5. Opfind IKKE fakta — brug kun information fra CV'erne.
+6. Hvis flere CV'er indeholder samme datapunkt, medtag det kun én gang og angiv alle relevante sourceCvIds.
+
+Returnér JSON:
+{
+  "entries": [
+    {
+      "title": "kort titel (max 80 tegn)",
+      "type": "employment" | "education" | "skill" | "project" | "achievement" | "story",
+      "description": "2-4 sætninger egnet til ansøgninger",
+      "keywords": ["nøgleord"],
+      "confidence": 1-5,
+      "whenToUse": "hvornår denne viden er relevant",
+      "results": ["konkrete resultater hvis nævnt"],
+      "metrics": [{"label": "...", "value": "..."}],
+      "sourceCvIds": ["cv-id"],
+      "employment": {
+        "company": "virksomhed",
+        "role": "rolle/titel",
+        "startDate": "YYYY-MM eller YYYY",
+        "endDate": "YYYY-MM eller YYYY",
+        "isCurrent": false,
+        "location": "by/land",
+        "employmentType": "full_time" | "part_time" | "contract" | "freelance" | "internship",
+        "responsibilities": ["ansvarsområde"]
+      }
+    }
+  ],
+  "skippedDuplicateCount": 0
+}
+
+Bemærk:
+- "employment"-feltet er KUN påkrævet når type er "employment".
+- "confidence" (1–5) er KUN påkrævet når type er "skill". Udelad feltet for alle andre typer.`;
 
 const openai = config.openaiApiKey ? new OpenAI({ apiKey: config.openaiApiKey }) : null;
 
@@ -77,8 +121,8 @@ function summarizeExisting(entries: Array<{
 }
 
 export class CvKnowledgeExtractionService {
-  async extractFromAllCvs(): Promise<CvKnowledgeExtractionResult> {
-    const templates = await CvTemplate.find().sort({ name: 1 });
+  async extractFromAllCvs(tenantId: Types.ObjectId | string): Promise<CvKnowledgeExtractionResult> {
+    const templates = await CvTemplate.find({ tenantId }).sort({ name: 1 });
     if (templates.length === 0) {
       return { candidates: [], skippedDuplicates: 0, cvsProcessed: 0, cvsSkipped: 0 };
     }
@@ -99,11 +143,11 @@ export class CvKnowledgeExtractionService {
       return { candidates: [], skippedDuplicates: 0, cvsProcessed: 0, cvsSkipped };
     }
 
-    const existing = await KnowledgeEntry.find().lean();
+    const existing = await KnowledgeEntry.find({ tenantId }).lean();
     const existingKeys = new Set(existing.map((e) => entryIdentityKey(e)));
 
     const extracted = openai
-      ? await this.extractWithAi(cvTexts, existing)
+      ? await this.extractWithAi(cvTexts, existing, tenantId)
       : this.extractFallback(cvTexts, existingKeys);
 
     const candidates: KnowledgeEntryDraft[] = [];
@@ -132,10 +176,14 @@ export class CvKnowledgeExtractionService {
     };
   }
 
-  async saveCandidates(entries: KnowledgeEntryDraft[]): Promise<string[]> {
+  async saveCandidates(
+    entries: KnowledgeEntryDraft[],
+    tenantId: Types.ObjectId | string
+  ): Promise<string[]> {
     const ids: string[] = [];
     for (const entry of entries) {
       const created = await KnowledgeEntry.create({
+        tenantId,
         title: entry.title,
         type: entry.type,
         description: entry.description || '',
@@ -160,7 +208,7 @@ export class CvKnowledgeExtractionService {
     if (!template.originalFile?.storageKey) return '';
 
     try {
-      const buffer = await storageService.download(template.originalFile.storageKey);
+      const buffer = await storageService.downloadByKey(template.originalFile.storageKey);
       const text = await extractTextFromBuffer(buffer, template.originalFile.mimeType);
       if (!text) return '';
 
@@ -182,7 +230,8 @@ export class CvKnowledgeExtractionService {
       type: string;
       description?: string;
       employment?: { company?: string; role?: string; startDate?: string; endDate?: string };
-    }>
+    }>,
+    tenantId: Types.ObjectId | string
   ): Promise<KnowledgeEntryDraft[]> {
     const cvBlock = cvTexts
       .map(
@@ -191,53 +240,15 @@ export class CvKnowledgeExtractionService {
       )
       .join('\n\n');
 
-    const prompt = `Du udtrækker strukturerede datapunkter fra CV'er til en Knowledge Base til jobansøgninger.
+    const promptContext = [
+      'KONTEKST:',
+      'EKSISTERENDE KNOWLEDGE BASE (må IKKE gentages — spring identisk eller næsten identisk indhold over):',
+      summarizeExisting(existing),
+      'CV-INDHOLD:',
+      cvBlock,
+    ].join('\n\n');
 
-EKSISTERENDE KNOWLEDGE BASE (må IKKE gentages — spring identisk eller næsten identisk indhold over):
-${summarizeExisting(existing)}
-
-CV-INDHOLD:
-${cvBlock}
-
-Opgave:
-1. Identificér ansættelser, uddannelser, kompetencer, projekter, resultater og relevante historier.
-2. Strukturér hvert datapunkt som en Knowledge Base-entry.
-3. UDELAD alt der allerede findes i knowledge base (samme ansættelse/virksomhed+rolle, samme uddannelse, samme kompetence/projekt osv.).
-4. Udelad personlige kontaktoplysninger (adresse, telefon, email) som egne entries.
-5. Opfind IKKE fakta — brug kun information fra CV'erne.
-6. Hvis flere CV'er indeholder samme datapunkt, medtag det kun én gang og angiv alle relevante sourceCvIds.
-
-Returnér JSON:
-{
-  "entries": [
-    {
-      "title": "kort titel (max 80 tegn)",
-      "type": "employment" | "education" | "skill" | "project" | "achievement" | "story",
-      "description": "2-4 sætninger egnet til ansøgninger",
-      "keywords": ["nøgleord"],
-      "confidence": 1-5,
-      "whenToUse": "hvornår denne viden er relevant",
-      "results": ["konkrete resultater hvis nævnt"],
-      "metrics": [{"label": "...", "value": "..."}],
-      "sourceCvIds": ["cv-id"],
-      "employment": {
-        "company": "virksomhed",
-        "role": "rolle/titel",
-        "startDate": "YYYY-MM eller YYYY",
-        "endDate": "YYYY-MM eller YYYY",
-        "isCurrent": false,
-        "location": "by/land",
-        "employmentType": "full_time" | "part_time" | "contract" | "freelance" | "internship",
-        "responsibilities": ["ansvarsområde"]
-      }
-    }
-  ],
-  "skippedDuplicateCount": 0
-}
-
-Bemærk:
-- "employment"-feltet er KUN påkrævet når type er "employment".
-- "confidence" (1–5) er KUN påkrævet når type er "skill". Udelad feltet for alle andre typer.`;
+    const prompt = composeAiPrompt(CV_KNOWLEDGE_EXTRACTION_INSTRUCTIONS, promptContext);
 
     const completion = await openai!.chat.completions.create({
       model: config.aiModel,

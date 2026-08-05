@@ -1,3 +1,4 @@
+import type { Types } from 'mongoose';
 import { Application, Company } from '../models';
 import type { DashboardData } from '@career-intelligence/shared';
 
@@ -11,9 +12,9 @@ const ACTIVE_STATUSES = [
   'offer',
 ];
 
-export async function getDashboardData(): Promise<DashboardData> {
-  const applications = await Application.find().sort({ updatedAt: -1 });
-  const companies = await Company.find().sort({ lastActivityAt: -1 }).limit(6);
+export async function getDashboardData(tenantId: Types.ObjectId | string): Promise<DashboardData> {
+  const applications = await Application.find({ tenantId }).sort({ updatedAt: -1 });
+  const companies = await Company.find({ tenantId }).sort({ lastActivityAt: -1 }).limit(6);
 
   const active = applications.filter((a) => ACTIVE_STATUSES.includes(a.status)).length;
   const readyToSend = applications.filter((a) => a.status === 'ready_to_send').length;

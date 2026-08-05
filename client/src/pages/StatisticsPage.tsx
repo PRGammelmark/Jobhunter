@@ -9,8 +9,10 @@ import {
 } from '@mui/material';
 import { api } from '../services/api';
 import type { Statistics } from '@career-intelligence/shared';
+import { useLocale } from '../i18n';
 
 export default function StatisticsPage() {
+  const { t } = useLocale();
   const [stats, setStats] = useState<Statistics | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -21,17 +23,17 @@ export default function StatisticsPage() {
   if (loading) return <Skeleton variant="rounded" height={400} />;
 
   const items = [
-    { label: 'Sendt', value: stats?.sent ?? 0 },
-    { label: 'Svar %', value: `${stats?.responseRate ?? 0}%` },
-    { label: 'Interviews %', value: `${stats?.interviewRate ?? 0}%` },
-    { label: 'Tilbud %', value: `${stats?.offerRate ?? 0}%` },
-    { label: 'Afslag %', value: `${stats?.rejectionRate ?? 0}%` },
-    { label: 'Gns. svartid', value: `${stats?.avgResponseDays ?? 0} dage` },
+    { label: t('statistics.sent'), value: stats?.sent ?? 0 },
+    { label: t('statistics.responseRate'), value: `${stats?.responseRate ?? 0}%` },
+    { label: t('statistics.interviewRate'), value: `${stats?.interviewRate ?? 0}%` },
+    { label: t('statistics.offerRate'), value: `${stats?.offerRate ?? 0}%` },
+    { label: t('statistics.rejectionRate'), value: `${stats?.rejectionRate ?? 0}%` },
+    { label: t('statistics.avgResponse'), value: t('statistics.days', { count: stats?.avgResponseDays ?? 0 }) },
   ];
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} gutterBottom>Statistik</Typography>
+      <Typography variant="h5" fontWeight={700} gutterBottom>{t('statistics.title')}</Typography>
       <Grid container spacing={2}>
         {items.map((item) => (
           <Grid item xs={6} key={item.label}>
@@ -48,12 +50,12 @@ export default function StatisticsPage() {
       {stats?.cvPerformance && stats.cvPerformance.length > 0 && (
         <Card sx={{ mt: 3 }}>
           <CardContent>
-            <Typography variant="subtitle1" fontWeight={600} gutterBottom>CV-performance</Typography>
+            <Typography variant="subtitle1" fontWeight={600} gutterBottom>{t('statistics.cvPerformance')}</Typography>
             {stats.cvPerformance.map((cv) => (
               <Box key={cv.cvTemplateId} sx={{ display: 'flex', justifyContent: 'space-between', py: 1 }}>
                 <Typography variant="body2">{cv.name}</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  {cv.timesUsed} brugt · {cv.interviews} interviews
+                  {t('statistics.cvStats', { times: cv.timesUsed, interviews: cv.interviews })}
                 </Typography>
               </Box>
             ))}

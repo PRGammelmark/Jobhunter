@@ -32,20 +32,16 @@ import { api, getFileUrl } from '../services/api';
 import type {
   CvTemplate,
   ApplicationTemplate,
+  Recommendation,
   CvKnowledgeExtractionResult,
   KnowledgeEntryDraft,
 } from '@career-intelligence/shared';
+import { useLocale } from '../i18n';
 
 type TemplateItem = CvTemplate | ApplicationTemplate;
-
-const TYPE_LABELS: Record<string, string> = {
-  employment: 'Ansættelse',
-  project: 'Projekt',
-  skill: 'Kompetence',
-  education: 'Uddannelse',
-  achievement: 'Resultat',
-  story: 'Historie',
-};
+type DeleteTarget =
+  | { type: 'cv' | 'app'; item: TemplateItem }
+  | { type: 'recommendation'; item: Recommendation };
 
 function formatFileSize(bytes?: number): string {
   if (!bytes) return '';
@@ -74,6 +70,7 @@ function TemplateList({
   onDelete: (item: TemplateItem) => void;
   onPreview: (item: TemplateItem) => void;
 }) {
+  const { t } = useLocale();
   if (loading) {
     return [1, 2].map((i) => <Skeleton key={i} variant="rounded" height={80} sx={{ mb: 1 }} />);
   }
@@ -88,11 +85,11 @@ function TemplateList({
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Typography variant="subtitle1" fontWeight={600}>{item.name}</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {item.isDefault && <Chip label="Default" size="small" color="primary" />}
+                {item.isDefault && <Chip label={t('cvTemplates.default')} size="small" color="primary" />}
                 <IconButton
                   size="small"
                   color="error"
-                  aria-label={`Slet ${item.name}`}
+                  aria-label={t('cvTemplates.deleteAria', { name: item.name })}
                   onClick={() => onDelete(item)}
                 >
                   <DeleteOutlineIcon fontSize="small" />
@@ -110,11 +107,11 @@ function TemplateList({
             )}
             {!item.originalFile && item.parsedContent?.rawText && (
               <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                Manuelt indtastet
+                {t('cvTemplates.manualEntered')}
               </Typography>
             )}
             <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-              Brugt {item.stats.timesUsed} gange · {item.stats.interviewsGenerated} interviews
+              {t('cvTemplates.statsUsed', { times: item.stats.timesUsed, interviews: item.stats.interviewsGenerated })}
             </Typography>
             {(item.originalFile || item.parsedContent?.rawText) && (
               <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
@@ -128,16 +125,16 @@ function TemplateList({
                     {previewLabel}
                   </Button>
                 )}
-                {item.originalFile && (
+                {item.originalFile?.fileId && (
                   <Button
                     size="small"
                     variant="outlined"
                     startIcon={<OpenInNewIcon />}
-                    href={getFileUrl(item.originalFile.storageKey)}
+                    href={getFileUrl(item.originalFile.fileId)}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    Åbn
+                    {t('cvTemplates.open')}
                   </Button>
                 )}
               </Box>
@@ -150,12 +147,14 @@ function TemplateList({
 }
 
 export default function CvTemplatesPage() {
+  const { t } = useLocale();
   const [tab, setTab] = useState(0);
   const [cvTemplates, setCvTemplates] = useState<CvTemplate[]>([]);
   const [appTemplates, setAppTemplates] = useState<ApplicationTemplate[]>([]);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewer, setViewer] = useState<TemplateItem | null>(null);
-  const [toDelete, setToDelete] = useState<{ type: 'cv' | 'app'; item: TemplateItem } | null>(null);
+  const [viewer, setViewer] = useState<TemplateItem | Recommendation | null>(null);
+  const [toDelete, setToDelete] = useState<DeleteTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualForm, setManualForm] = useState({ name: '', content: '' });
@@ -169,11 +168,17 @@ export default function CvTemplatesPage() {
   const [extractSuccess, setExtractSuccess] = useState<string | null>(null);
   const cvFileRef = useRef<HTMLInputElement>(null);
   const appFileRef = useRef<HTMLInputElement>(null);
+  const recFileRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
-    const [cvs, apps] = await Promise.all([api.getCvTemplates(), api.getApplicationTemplates()]);
+    const [cvs, apps, recs] = await Promise.all([
+      api.getCvTemplates(),
+      api.getApplicationTemplates(),
+      api.getRecommendations(),
+    ]);
     setCvTemplates(cvs);
     setAppTemplates(apps);
+    setRecommendations(recs);
   };
 
   useEffect(() => {
@@ -193,6 +198,14 @@ export default function CvTemplatesPage() {
     form.append('file', file);
     form.append('name', file.name.replace(/\.[^.]+$/, ''));
     await api.createApplicationTemplate(form);
+    load();
+  };
+
+  const uploadRecommendation = async (file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('name', file.name.replace(/\.[^.]+$/, ''));
+    await api.createRecommendation(form);
     load();
   };
 
@@ -223,8 +236,10 @@ export default function CvTemplatesPage() {
     try {
       if (toDelete.type === 'cv') {
         await api.deleteCvTemplate(toDelete.item._id);
-      } else {
+      } else if (toDelete.type === 'app') {
         await api.deleteApplicationTemplate(toDelete.item._id);
+      } else {
+        await api.deleteRecommendation(toDelete.item._id);
       }
       if (viewer?._id === toDelete.item._id) setViewer(null);
       setToDelete(null);
@@ -246,7 +261,7 @@ export default function CvTemplatesPage() {
       setExtractResult(result);
       setSelectedIndexes(new Set(result.candidates.map((_, i) => i)));
     } catch (err) {
-      setExtractError(err instanceof Error ? err.message : 'Udtrækning fejlede');
+      setExtractError(err instanceof Error ? err.message : t('cvTemplates.extractDialog.errorExtract'));
     } finally {
       setExtracting(false);
     }
@@ -286,19 +301,25 @@ export default function CvTemplatesPage() {
     setExtractError(null);
     try {
       const result = await api.confirmCvKnowledgeExtraction(selected);
-      setExtractSuccess(`${result.count} datapunkt${result.count === 1 ? '' : 'er'} tilføjet til knowledge base.`);
+      setExtractSuccess(t(
+        result.count === 1
+          ? 'cvTemplates.extractDialog.success'
+          : 'cvTemplates.extractDialog.successPlural',
+        { count: result.count }
+      ));
       setExtractResult({ ...extractResult, candidates: [] });
       setSelectedIndexes(new Set());
     } catch (err) {
-      setExtractError(err instanceof Error ? err.message : 'Kunne ikke gemme');
+      setExtractError(err instanceof Error ? err.message : t('cvTemplates.extractDialog.errorSave'));
     } finally {
       setSavingExtract(false);
     }
   };
 
-  const viewerUrl = viewer?.originalFile ? getFileUrl(viewer.originalFile.storageKey) : '';
+  const viewerUrl = viewer?.originalFile?.fileId ? getFileUrl(viewer.originalFile.fileId) : '';
   const viewerIsPdf = viewer?.originalFile?.mimeType === 'application/pdf';
-  const viewerText = viewer?.parsedContent?.rawText;
+  const viewerText =
+    viewer && 'parsedContent' in viewer ? viewer.parsedContent?.rawText : undefined;
   const selectedCount = selectedIndexes.size;
   const allSelected =
     !!extractResult &&
@@ -307,14 +328,15 @@ export default function CvTemplatesPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} gutterBottom>CV &amp; templates</Typography>
+      <Typography variant="h5" fontWeight={700} gutterBottom>{t('cvTemplates.title')}</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Upload CV&apos;er og ansøgningsskabeloner som AI kan tage udgangspunkt i.
+        {t('cvTemplates.subtitle')}
       </Typography>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-        <Tab label="CV'er" />
-        <Tab label="Ansøgningsskabeloner" />
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }} variant="scrollable" scrollButtons="auto">
+        <Tab label={t('cvTemplates.tabs.cvs')} />
+        <Tab label={t('cvTemplates.tabs.appTemplates')} />
+        <Tab label={t('cvTemplates.tabs.recommendations')} />
       </Tabs>
 
       <input
@@ -331,24 +353,41 @@ export default function CvTemplatesPage() {
         hidden
         onChange={(e) => e.target.files?.[0] && uploadApp(e.target.files[0])}
       />
+      <input
+        ref={recFileRef}
+        type="file"
+        accept=".pdf,.docx,.doc,.txt,.png,.jpg,.jpeg"
+        hidden
+        onChange={(e) => e.target.files?.[0] && uploadRecommendation(e.target.files[0])}
+      />
 
       <Box sx={{ display: 'flex', gap: 1, mb: 3, flexWrap: 'wrap' }}>
         <Button
           variant="contained"
           startIcon={<UploadFileIcon />}
           sx={{ flex: '1 1 140px' }}
-          onClick={() => (tab === 0 ? cvFileRef.current?.click() : appFileRef.current?.click())}
+          onClick={() => {
+            if (tab === 0) cvFileRef.current?.click();
+            else if (tab === 1) appFileRef.current?.click();
+            else recFileRef.current?.click();
+          }}
         >
-          {tab === 0 ? 'Upload CV' : 'Upload ansøgning'}
+          {tab === 0
+            ? t('cvTemplates.upload.cv')
+            : tab === 1
+              ? t('cvTemplates.upload.application')
+              : t('cvTemplates.upload.recommendation')}
         </Button>
-        <Button
-          variant="outlined"
-          startIcon={<EditNoteIcon />}
-          sx={{ flex: '1 1 140px' }}
-          onClick={openManual}
-        >
-          Tilføj manuelt
-        </Button>
+        {tab < 2 && (
+          <Button
+            variant="outlined"
+            startIcon={<EditNoteIcon />}
+            sx={{ flex: '1 1 140px' }}
+            onClick={openManual}
+          >
+            {t('cvTemplates.addManual')}
+          </Button>
+        )}
         {tab === 0 && (
           <Button
             variant="outlined"
@@ -358,7 +397,7 @@ export default function CvTemplatesPage() {
             onClick={startExtract}
             disabled={loading || cvTemplates.length === 0}
           >
-            Udtræk data til knowledge base
+            {t('cvTemplates.extractToKnowledge')}
           </Button>
         )}
       </Box>
@@ -367,36 +406,94 @@ export default function CvTemplatesPage() {
         <TemplateList
           items={cvTemplates}
           loading={loading}
-          emptyLabel="Ingen CV'er endnu"
-          previewLabel="Se CV"
+          emptyLabel={t('cvTemplates.empty.cvs')}
+          previewLabel={t('cvTemplates.preview.cv')}
           onDelete={(item) => setToDelete({ type: 'cv', item })}
           onPreview={setViewer}
         />
-      ) : (
+      ) : tab === 1 ? (
         <TemplateList
           items={appTemplates}
           loading={loading}
-          emptyLabel="Ingen ansøgningsskabeloner endnu"
-          previewLabel="Se skabelon"
+          emptyLabel={t('cvTemplates.empty.appTemplates')}
+          previewLabel={t('cvTemplates.preview.template')}
           onDelete={(item) => setToDelete({ type: 'app', item })}
           onPreview={setViewer}
         />
+      ) : loading ? (
+        [1, 2].map((i) => <Skeleton key={i} variant="rounded" height={80} sx={{ mb: 1 }} />)
+      ) : recommendations.length === 0 ? (
+        <Typography color="text.secondary">
+          {t('cvTemplates.empty.recommendations')}
+        </Typography>
+      ) : (
+        recommendations.map((item) => (
+          <Card key={item._id} sx={{ mb: 1.5 }}>
+            <CardContent>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="subtitle1" fontWeight={600}>{item.name}</Typography>
+                <IconButton
+                  size="small"
+                  color="error"
+                  aria-label={t('cvTemplates.deleteAria', { name: item.name })}
+                  onClick={() => setToDelete({ type: 'recommendation', item })}
+                >
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </Box>
+              {item.from && (
+                <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  {t('cvTemplates.recommendationFrom', { name: item.from })}
+                </Typography>
+              )}
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
+                {item.originalFile.fileName}
+                {item.originalFile.sizeBytes ? ` · ${formatFileSize(item.originalFile.sizeBytes)}` : ''}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
+                {(item.originalFile.mimeType === 'application/pdf' ||
+                  item.originalFile.mimeType === 'text/plain') && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<VisibilityIcon />}
+                    onClick={() => setViewer(item)}
+                  >
+                    {t('cvTemplates.preview.recommendation')}
+                  </Button>
+                )}
+                {item.originalFile.fileId && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<OpenInNewIcon />}
+                    href={getFileUrl(item.originalFile.fileId)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    {t('cvTemplates.open')}
+                  </Button>
+                )}
+              </Box>
+            </CardContent>
+          </Card>
+        ))
       )}
 
       <Dialog open={manualOpen} onClose={() => !saving && setManualOpen(false)} fullWidth maxWidth="md">
         <DialogTitle>
-          {tab === 0 ? 'Tilføj CV manuelt' : 'Tilføj ansøgningsskabelon manuelt'}
+          {tab === 0 ? t('cvTemplates.manualDialog.titleCv') : t('cvTemplates.manualDialog.titleApp')}
         </DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <TextField
-            label="Navn"
+            label={t('cvTemplates.manualDialog.name')}
             fullWidth
             value={manualForm.name}
             onChange={(e) => setManualForm({ ...manualForm, name: e.target.value })}
-            placeholder={tab === 0 ? 'F.eks. Standard CV' : 'F.eks. Kort ansøgning'}
+            placeholder={tab === 0 ? t('cvTemplates.manualDialog.namePlaceholderCv') : t('cvTemplates.manualDialog.namePlaceholderApp')}
           />
           <TextField
-            label={tab === 0 ? 'CV-indhold' : 'Ansøgningstekst'}
+            label={tab === 0 ? t('cvTemplates.manualDialog.contentCv') : t('cvTemplates.manualDialog.contentApp')}
             fullWidth
             multiline
             rows={12}
@@ -404,19 +501,19 @@ export default function CvTemplatesPage() {
             onChange={(e) => setManualForm({ ...manualForm, content: e.target.value })}
             placeholder={
               tab === 0
-                ? 'Indsæt dit CV-indhold her...'
-                : 'Indsæt en tidligere ansøgning som skabelon...'
+                ? t('cvTemplates.manualDialog.contentPlaceholderCv')
+                : t('cvTemplates.manualDialog.contentPlaceholderApp')
             }
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setManualOpen(false)} disabled={saving}>Annuller</Button>
+          <Button onClick={() => setManualOpen(false)} disabled={saving}>{t('cvTemplates.manualDialog.cancel')}</Button>
           <Button
             variant="contained"
             onClick={saveManual}
             disabled={saving || !manualForm.name.trim() || !manualForm.content.trim()}
           >
-            Gem
+            {t('cvTemplates.manualDialog.save')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -428,8 +525,8 @@ export default function CvTemplatesPage() {
         maxWidth="md"
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pr: 1 }}>
-          Udtræk data til knowledge base
-          <IconButton onClick={closeExtract} disabled={extracting || savingExtract} aria-label="Luk">
+          {t('cvTemplates.extractDialog.title')}
+          <IconButton onClick={closeExtract} disabled={extracting || savingExtract} aria-label={t('cvTemplates.extractDialog.closeAria')}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
@@ -438,7 +535,7 @@ export default function CvTemplatesPage() {
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4, gap: 2 }}>
               <CircularProgress />
               <Typography variant="body2" color="text.secondary" textAlign="center">
-                AI gennemlæser dine CV&apos;er og sammenligner med knowledge base...
+                {t('cvTemplates.extractDialog.loading')}
               </Typography>
             </Box>
           )}
@@ -454,18 +551,23 @@ export default function CvTemplatesPage() {
           {!extracting && extractResult && (
             <>
               <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                {`Gennemgik ${extractResult.cvsProcessed} CV${extractResult.cvsProcessed === 1 ? '' : "'er"}`}
+                {t(
+                  extractResult.cvsProcessed === 1
+                    ? 'cvTemplates.extractDialog.summaryCvsSingular'
+                    : 'cvTemplates.extractDialog.summaryCvsPlural',
+                  { count: extractResult.cvsProcessed }
+                )}
                 {extractResult.cvsSkipped > 0
-                  ? ` · ${extractResult.cvsSkipped} uden læsbart indhold sprunget over`
+                  ? t('cvTemplates.extractDialog.summarySkipped', { count: extractResult.cvsSkipped })
                   : ''}
                 {extractResult.skippedDuplicates > 0
-                  ? ` · ${extractResult.skippedDuplicates} allerede i knowledge base`
+                  ? t('cvTemplates.extractDialog.summaryDuplicates', { count: extractResult.skippedDuplicates })
                   : ''}
               </Typography>
 
               {extractResult.candidates.length === 0 ? (
                 <Alert severity="info">
-                  Ingen nye datapunkter fundet. Alt relevant indhold fra CV&apos;erne ser ud til allerede at ligge i knowledge base.
+                  {t('cvTemplates.extractDialog.noneFound')}
                 </Alert>
               ) : (
                 <>
@@ -477,7 +579,7 @@ export default function CvTemplatesPage() {
                         onChange={(e) => toggleAll(e.target.checked)}
                       />
                     }
-                    label={`Vælg alle (${extractResult.candidates.length})`}
+                    label={t('cvTemplates.extractDialog.selectAll', { count: extractResult.candidates.length })}
                     sx={{ mb: 1 }}
                   />
                   <Divider sx={{ mb: 1 }} />
@@ -501,7 +603,7 @@ export default function CvTemplatesPage() {
                             <Box sx={{ flex: 1, minWidth: 0 }}>
                               <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mb: 0.5, alignItems: 'center' }}>
                                 <Chip
-                                  label={TYPE_LABELS[candidate.type] || candidate.type}
+                                  label={t(`cvTemplates.types.${candidate.type}`)}
                                   size="small"
                                   color="primary"
                                   variant="outlined"
@@ -515,7 +617,7 @@ export default function CvTemplatesPage() {
                                   {[
                                     candidate.employment.role,
                                     candidate.employment.company,
-                                    [candidate.employment.startDate, candidate.employment.isCurrent ? 'nu' : candidate.employment.endDate]
+                                    [candidate.employment.startDate, candidate.employment.isCurrent ? t('common.present') : candidate.employment.endDate]
                                       .filter(Boolean)
                                       .join(' – '),
                                   ]
@@ -548,7 +650,7 @@ export default function CvTemplatesPage() {
         </DialogContent>
         <DialogActions>
           <Button onClick={closeExtract} disabled={extracting || savingExtract}>
-            {extractSuccess ? 'Luk' : 'Annuller'}
+            {extractSuccess ? t('cvTemplates.extractDialog.close') : t('cvTemplates.extractDialog.cancel')}
           </Button>
           {!extractSuccess && extractResult && extractResult.candidates.length > 0 && (
             <Button
@@ -557,23 +659,29 @@ export default function CvTemplatesPage() {
               disabled={savingExtract || selectedCount === 0}
               startIcon={savingExtract ? <CircularProgress size={16} color="inherit" /> : undefined}
             >
-              Tilføj valgte ({selectedCount})
+              {t('cvTemplates.extractDialog.addSelected', { count: selectedCount })}
             </Button>
           )}
         </DialogActions>
       </Dialog>
 
       <Dialog open={!!toDelete} onClose={() => !deleting && setToDelete(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>{toDelete?.type === 'cv' ? 'Slet CV?' : 'Slet skabelon?'}</DialogTitle>
+        <DialogTitle>
+          {toDelete?.type === 'cv'
+            ? t('cvTemplates.deleteDialog.titleCv')
+            : toDelete?.type === 'recommendation'
+              ? t('cvTemplates.deleteDialog.titleRecommendation')
+              : t('cvTemplates.deleteDialog.titleTemplate')}
+        </DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            Er du sikker på, at du vil slette <strong>{toDelete?.item.name}</strong>? Dette kan ikke fortrydes.
+            {t('cvTemplates.deleteDialog.confirm', { name: toDelete?.item.name || '' })}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setToDelete(null)} disabled={deleting}>Annuller</Button>
+          <Button onClick={() => setToDelete(null)} disabled={deleting}>{t('cvTemplates.deleteDialog.cancel')}</Button>
           <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting}>
-            Slet
+            {t('cvTemplates.deleteDialog.confirmAction')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -587,7 +695,7 @@ export default function CvTemplatesPage() {
       >
         <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pr: 1 }}>
           {viewer?.name}
-          <IconButton onClick={() => setViewer(null)} aria-label="Luk">
+          <IconButton onClick={() => setViewer(null)} aria-label={t('cvTemplates.viewer.closeAria')}>
             <CloseIcon />
           </IconButton>
         </DialogTitle>
@@ -608,7 +716,7 @@ export default function CvTemplatesPage() {
           {!viewerIsPdf && !viewerText && viewer?.originalFile && (
             <Box sx={{ textAlign: 'center', py: 4 }}>
               <Typography color="text.secondary" sx={{ mb: 2 }}>
-                Denne filtype kan ikke vises direkte i browseren.
+                {t('cvTemplates.viewer.cannotPreview')}
               </Typography>
               <Button
                 variant="contained"
@@ -617,7 +725,7 @@ export default function CvTemplatesPage() {
                 target="_blank"
                 rel="noopener noreferrer"
               >
-                Åbn {viewer.originalFile.fileName}
+                {t('cvTemplates.viewer.openFile', { fileName: viewer.originalFile.fileName })}
               </Button>
             </Box>
           )}
@@ -630,9 +738,9 @@ export default function CvTemplatesPage() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              Åbn i ny fane
+              {t('cvTemplates.viewer.openInNewTab')}
             </Button>
-            <Button onClick={() => setViewer(null)}>Luk</Button>
+            <Button onClick={() => setViewer(null)}>{t('cvTemplates.viewer.close')}</Button>
           </DialogActions>
         )}
       </Dialog>

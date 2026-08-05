@@ -30,6 +30,7 @@ import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
 import WishlistButton from '../components/pipeline/WishlistButton';
 import type { Application, Company } from '@career-intelligence/shared';
+import { useLocale } from '../i18n';
 
 type CompanyForm = {
   name: string;
@@ -68,6 +69,7 @@ function mergeResearch(form: CompanyForm, research: Partial<CompanyForm>): Compa
 export default function CompanyPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t, formatDate } = useLocale();
   const [company, setCompany] = useState<Company | null>(null);
   const [applications, setApplications] = useState<Application[]>([]);
   const [form, setForm] = useState<CompanyForm | null>(null);
@@ -124,7 +126,7 @@ export default function CompanyPage() {
     const searchName = form.name.trim();
     const searchCvr = form.cvr.trim();
     if (!searchName && !searchCvr) {
-      setResearchError('Angiv virksomhedsnavn eller CVR-nummer');
+      setResearchError(t('company.researchErrorRequired'));
       return;
     }
 
@@ -139,7 +141,7 @@ export default function CompanyPage() {
       setForm(mergeResearch(form, result));
       if (result.sources?.length) setResearchSources(result.sources);
     } catch (err) {
-      setResearchError(err instanceof Error ? err.message : 'Kunne ikke hente virksomhedsdata');
+      setResearchError(err instanceof Error ? err.message : t('company.researchErrorGeneric'));
     } finally {
       setResearching(false);
     }
@@ -176,14 +178,14 @@ export default function CompanyPage() {
       await api.deleteCompany(id);
       navigate('/companies');
     } catch (err) {
-      setDeleteError(err instanceof Error ? err.message : 'Kunne ikke slette virksomhed');
+      setDeleteError(err instanceof Error ? err.message : t('company.deleteDialog.error'));
     } finally {
       setDeleting(false);
     }
   };
 
   if (loading) return <Skeleton variant="rounded" height={300} />;
-  if (!company || !form) return <Typography>Virksomhed ikke fundet</Typography>;
+  if (!company || !form) return <Typography>{t('company.notFound')}</Typography>;
 
   const linkedJobCount = applications.length;
 
@@ -194,7 +196,7 @@ export default function CompanyPage() {
         {!editing && (
           <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
             <Button startIcon={<EditIcon />} onClick={() => setEditing(true)}>
-              Rediger
+              {t('company.edit')}
             </Button>
             <Button
               color="error"
@@ -203,19 +205,19 @@ export default function CompanyPage() {
                 setDeleteError(null);
                 setDeleteDialog(true);
               }}
-              title="Slet virksomhed"
+              title={t('company.deleteTitle')}
             >
-              Slet
+              {t('company.delete')}
             </Button>
           </Box>
         )}
       </Box>
 
-      {saved && <Alert severity="success">Gemt!</Alert>}
+      {saved && <Alert severity="success">{t('company.saved')}</Alert>}
 
       <Card>
         <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <Typography variant="subtitle1" fontWeight={600}>Virksomhedsinfo</Typography>
+          <Typography variant="subtitle1" fontWeight={600}>{t('company.info')}</Typography>
 
           {editing ? (
             <>
@@ -226,31 +228,31 @@ export default function CompanyPage() {
                   onClick={autoFill}
                   disabled={researching || (!form.name.trim() && !form.cvr.trim())}
                 >
-                  Find og autoudfyld
+                  {t('company.autoFill')}
                 </Button>
               </Box>
               {researchError && <Alert severity="error">{researchError}</Alert>}
               {researchSources && (
                 <Alert severity="info">
-                  Data hentet fra: {researchSources.join(', ')}
+                  {t('company.researchSources', { sources: researchSources.join(', ') })}
                 </Alert>
               )}
               <TextField
-                label="Navn"
+                label={t('company.fields.name')}
                 fullWidth
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
               <TextField
-                label="CVR-nummer"
+                label={t('company.fields.cvr')}
                 fullWidth
-                placeholder="8 cifre"
+                placeholder={t('company.fields.cvrPlaceholder')}
                 value={form.cvr}
                 onChange={(e) => setForm({ ...form, cvr: e.target.value })}
-                helperText="Søg med navn eller CVR-nummer"
+                helperText={t('company.fields.cvrHelp')}
               />
               <TextField
-                label="Beskrivelse"
+                label={t('company.fields.description')}
                 fullWidth
                 multiline
                 rows={3}
@@ -258,41 +260,41 @@ export default function CompanyPage() {
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
               />
               <TextField
-                label="Branche"
+                label={t('company.fields.industry')}
                 fullWidth
                 value={form.industry}
                 onChange={(e) => setForm({ ...form, industry: e.target.value })}
               />
               <TextField
-                label="Hjemmeside"
+                label={t('company.fields.website')}
                 fullWidth
                 value={form.website}
                 onChange={(e) => setForm({ ...form, website: e.target.value })}
               />
               <TextField
-                label="LinkedIn"
+                label={t('company.fields.linkedIn')}
                 fullWidth
                 value={form.linkedIn}
                 onChange={(e) => setForm({ ...form, linkedIn: e.target.value })}
               />
               <TextField
-                label="Antal ansatte"
+                label={t('company.fields.employeeCount')}
                 fullWidth
                 value={form.employeeCount}
                 onChange={(e) => setForm({ ...form, employeeCount: e.target.value })}
               />
               <TextField
-                label="Lokation"
+                label={t('company.fields.location')}
                 fullWidth
                 value={form.location}
                 onChange={(e) => setForm({ ...form, location: e.target.value })}
               />
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <Button variant="contained" onClick={save} disabled={saving || !form.name.trim()}>
-                  Gem
+                  {t('company.save')}
                 </Button>
                 <Button onClick={cancelEdit} disabled={saving}>
-                  Annuller
+                  {t('company.cancel')}
                 </Button>
               </Box>
             </>
@@ -300,7 +302,7 @@ export default function CompanyPage() {
             <>
               {company.cvr && (
                 <Typography variant="body2" color="text.secondary">
-                  CVR: {company.cvr}
+                  {t('company.cvrDisplay', { cvr: company.cvr })}
                 </Typography>
               )}
               {company.industry && <Chip label={company.industry} size="small" />}
@@ -324,7 +326,7 @@ export default function CompanyPage() {
                 )}
                 {company.employeeCount && (
                   <Typography variant="body2" color="text.secondary">
-                    {company.employeeCount} ansatte
+                    {t('company.employees', { count: company.employeeCount })}
                   </Typography>
                 )}
                 {company.location && (
@@ -335,7 +337,7 @@ export default function CompanyPage() {
               </Box>
               {!company.description && !company.website && !company.linkedIn && !company.employeeCount && !company.location && !company.industry && !company.cvr && (
                 <Typography variant="body2" color="text.secondary">
-                  Ingen info endnu. Klik Rediger for at tilføje.
+                  {t('company.noInfoYet')}
                 </Typography>
               )}
             </>
@@ -345,16 +347,16 @@ export default function CompanyPage() {
 
       <Card>
         <CardContent>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>Noter & aktiviteter</Typography>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>{t('company.notes.title')}</Typography>
           <Typography variant="caption" color="text.secondary">
-            Første kontakt: {new Date(company.firstSeenAt).toLocaleDateString('da-DK')} ·
-            Seneste aktivitet: {new Date(company.lastActivityAt).toLocaleDateString('da-DK')}
+            {t('company.notes.firstContact', { date: formatDate(company.firstSeenAt) })} ·{' '}
+            {t('company.notes.lastActivity', { date: formatDate(company.lastActivityAt) })}
           </Typography>
 
           {company.memory.interviewQuestions.length > 0 && (
             <>
               <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2">Tidligere interview-spørgsmål</Typography>
+              <Typography variant="subtitle2">{t('company.notes.interviewQuestions')}</Typography>
               <List dense>{company.memory.interviewQuestions.map((q) => <ListItem key={q} disablePadding><ListItemText primary={q} /></ListItem>)}</List>
             </>
           )}
@@ -362,7 +364,7 @@ export default function CompanyPage() {
           {company.memory.contacts.length > 0 && (
             <>
               <Divider sx={{ my: 2 }} />
-              <Typography variant="subtitle2">Kontakter</Typography>
+              <Typography variant="subtitle2">{t('company.notes.contacts')}</Typography>
               <List dense>
                 {company.memory.contacts.map((c) => (
                   <ListItem key={c.name} disablePadding>
@@ -396,7 +398,7 @@ export default function CompanyPage() {
                   </Typography>
                   <IconButton
                     size="small"
-                    aria-label="Fjern note"
+                    aria-label={t('company.notes.removeAria')}
                     onClick={() => removeNote(i)}
                     disabled={removingNoteIndex === i}
                   >
@@ -410,13 +412,13 @@ export default function CompanyPage() {
             <TextField
               size="small"
               fullWidth
-              placeholder="Tilføj en note..."
+              placeholder={t('company.notes.placeholder')}
               value={noteInput}
               onChange={(e) => setNoteInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addNote()}
             />
             <Button onClick={addNote} disabled={addingNote || !noteInput.trim()}>
-              Tilføj
+              {t('company.notes.add')}
             </Button>
           </Box>
 
@@ -426,11 +428,11 @@ export default function CompanyPage() {
       <Card>
         <CardContent>
           <Typography variant="subtitle1" fontWeight={600} gutterBottom>
-            Stillingsopslag ({applications.length})
+            {t('company.jobs.title', { count: applications.length })}
           </Typography>
           {applications.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              Ingen stillingsopslag tilknyttet — brug virksomheden til research og noter til uopfordrede ansøgninger.
+              {t('company.jobs.empty')}
             </Typography>
           ) : (
             applications.map((app) => (
@@ -463,16 +465,19 @@ export default function CompanyPage() {
       </Card>
 
       <Dialog open={deleteDialog} onClose={() => !deleting && setDeleteDialog(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Slet virksomhed?</DialogTitle>
+        <DialogTitle>{t('company.deleteDialog.title')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            Er du sikker på, at du vil slette <strong>{company.name}</strong>? Dette kan ikke fortrydes.
+            {t('company.deleteDialog.confirm', { name: company.name })}
           </Typography>
           {linkedJobCount > 0 && (
             <Alert severity="warning" sx={{ mt: 2 }}>
-              Virksomheden har {linkedJobCount}{' '}
-              {linkedJobCount === 1 ? 'tilknyttet stillingsopslag' : 'tilknyttede stillingsopslag'}.
-              Hvis du går videre, slettes {linkedJobCount === 1 ? 'det' : 'disse'} også.
+              {t(
+                linkedJobCount === 1
+                  ? 'company.deleteDialog.linkedSingular'
+                  : 'company.deleteDialog.linkedPlural',
+                { count: linkedJobCount }
+              )}
             </Alert>
           )}
           {deleteError && (
@@ -482,14 +487,14 @@ export default function CompanyPage() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialog(false)} disabled={deleting}>Annuller</Button>
+          <Button onClick={() => setDeleteDialog(false)} disabled={deleting}>{t('company.deleteDialog.cancel')}</Button>
           <Button
             variant="contained"
             color="error"
             onClick={confirmDelete}
             disabled={deleting}
           >
-            {deleting ? <CircularProgress size={16} /> : 'Slet'}
+            {deleting ? <CircularProgress size={16} /> : t('company.deleteDialog.confirmAction')}
           </Button>
         </DialogActions>
       </Dialog>

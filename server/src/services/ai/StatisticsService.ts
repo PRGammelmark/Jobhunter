@@ -1,10 +1,11 @@
+import type { Types } from 'mongoose';
 import { Application, CvTemplate } from '../../models';
 import type { Statistics } from '@career-intelligence/shared';
 
 export class StatisticsService {
-  async getStatistics(): Promise<Statistics> {
-    const applications = await Application.find();
-    const cvs = await CvTemplate.find();
+  async getStatistics(tenantId: Types.ObjectId | string): Promise<Statistics> {
+    const applications = await Application.find({ tenantId });
+    const cvs = await CvTemplate.find({ tenantId });
 
     const sent = applications.filter((a) =>
       ['sent', 'interview', 'offer', 'rejected', 'hired'].includes(a.status)

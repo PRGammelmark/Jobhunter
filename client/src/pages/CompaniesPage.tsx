@@ -14,9 +14,11 @@ import AddIcon from '@mui/icons-material/Add';
 import BusinessIcon from '@mui/icons-material/Business';
 import { api } from '../services/api';
 import type { Company } from '@career-intelligence/shared';
+import { useLocale } from '../i18n';
 
 export default function CompaniesPage() {
   const navigate = useNavigate();
+  const { t, formatDate } = useLocale();
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -26,16 +28,16 @@ export default function CompaniesPage() {
 
   return (
     <Box sx={{ pb: 10 }}>
-      <Typography variant="h5" fontWeight={700} gutterBottom>Virksomheder</Typography>
+      <Typography variant="h5" fontWeight={700} gutterBottom>{t('companies.title')}</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Virksomheder du følger — med eller uden stillingsopslag.
+        {t('companies.subtitle')}
       </Typography>
 
       {loading ? (
         [1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={80} sx={{ mb: 1 }} />)
       ) : companies.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          Ingen virksomheder endnu. Opret en for at komme i gang.
+          {t('companies.empty')}
         </Typography>
       ) : (
         companies.map((company) => (
@@ -58,10 +60,10 @@ export default function CompaniesPage() {
                 )}
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
                   {company.applicationIds.length === 0
-                    ? 'Ingen stillingsopslag'
-                    : `${company.applicationIds.length} stillingsopslag`}
+                    ? t('companies.noJobs')
+                    : t('companies.jobsCount', { count: company.applicationIds.length })}
                   {' · '}
-                  Seneste aktivitet: {new Date(company.lastActivityAt).toLocaleDateString('da-DK')}
+                  {t('companies.lastActivity', { date: formatDate(company.lastActivityAt) })}
                 </Typography>
               </CardContent>
             </CardActionArea>
@@ -72,12 +74,12 @@ export default function CompaniesPage() {
       <Fab
         variant="extended"
         color="primary"
-        aria-label="Ny virksomhed"
+        aria-label={t('companies.newCompanyAria')}
         sx={{ position: 'fixed', bottom: 80, right: 16, zIndex: 1100 }}
         onClick={() => navigate('/companies/new')}
       >
         <AddIcon sx={{ mr: 1 }} />
-        Ny virksomhed
+        {t('companies.newCompany')}
       </Fab>
     </Box>
   );

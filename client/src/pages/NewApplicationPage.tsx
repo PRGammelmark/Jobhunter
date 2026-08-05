@@ -11,9 +11,11 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { api } from '../services/api';
+import { useLocale } from '../i18n';
 
 export default function NewApplicationPage() {
   const navigate = useNavigate();
+  const { t } = useLocale();
   const [tab, setTab] = useState(0);
   const [url, setUrl] = useState('');
   const [manualText, setManualText] = useState('');
@@ -31,7 +33,7 @@ export default function NewApplicationPage() {
       );
       navigate(`/applications/${app._id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fejl ved oprettelse');
+      setError(e instanceof Error ? e.message : t('newApplication.createError'));
     } finally {
       setLoading(false);
     }
@@ -39,17 +41,17 @@ export default function NewApplicationPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} gutterBottom>Nyt stillingsopslag</Typography>
+      <Typography variant="h5" fontWeight={700} gutterBottom>{t('newApplication.title')}</Typography>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-        <Tab label="Joblink" />
-        <Tab label="Manuel tekst" />
+        <Tab label={t('newApplication.tabLink')} />
+        <Tab label={t('newApplication.tabManual')} />
       </Tabs>
 
       {tab === 0 ? (
         <TextField
           fullWidth
-          label="Joblink"
+          label={t('newApplication.jobLink')}
           placeholder="https://www.jobindex.dk/..."
           value={url}
           onChange={(e) => setUrl(e.target.value)}
@@ -57,13 +59,13 @@ export default function NewApplicationPage() {
         />
       ) : (
         <>
-          <TextField fullWidth label="Stilling" value={title} onChange={(e) => setTitle(e.target.value)} sx={{ mb: 2 }} />
-          <TextField fullWidth label="Virksomhed" value={companyName} onChange={(e) => setCompanyName(e.target.value)} sx={{ mb: 2 }} />
+          <TextField fullWidth label={t('newApplication.jobTitle')} value={title} onChange={(e) => setTitle(e.target.value)} sx={{ mb: 2 }} />
+          <TextField fullWidth label={t('newApplication.company')} value={companyName} onChange={(e) => setCompanyName(e.target.value)} sx={{ mb: 2 }} />
           <TextField
             fullWidth
             multiline
             rows={8}
-            label="Jobtekst"
+            label={t('newApplication.jobText')}
             value={manualText}
             onChange={(e) => setManualText(e.target.value)}
             sx={{ mb: 2 }}
@@ -81,7 +83,7 @@ export default function NewApplicationPage() {
         onClick={handleSubmit}
         startIcon={loading ? <CircularProgress size={20} color="inherit" /> : undefined}
       >
-        {loading ? 'Opretter, analyserer og genererer ansøgning...' : 'Opret stillingsopslag'}
+        {loading ? t('newApplication.creating') : t('newApplication.create')}
       </Button>
     </Box>
   );

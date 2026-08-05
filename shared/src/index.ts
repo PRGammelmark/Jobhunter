@@ -70,11 +70,41 @@ export type InterviewType =
 export type InterviewFormat = 'online' | 'physical' | 'hybrid';
 
 export interface FileRef {
+  /** Database id for authenticated download via /api/files/:fileId */
+  fileId?: string;
   storageKey: string;
   mimeType: string;
   fileName: string;
   sizeBytes?: number;
   uploadedAt?: string;
+}
+
+/** Global unique email is intentional for MVP (1 user = 1 tenant). Multi-workspace needs Membership later. */
+export type PlatformRole = 'admin' | 'user';
+
+export type AccountStatus = 'active' | 'disabled' | 'deleted';
+
+export interface AuthUser {
+  _id: string;
+  email: string;
+  name: string;
+  platformRole: PlatformRole;
+  tenantId: string;
+  status: AccountStatus;
+}
+
+export interface AuthStatus {
+  setupRequired: boolean;
+}
+
+export interface PlatformUser {
+  _id: string;
+  email: string;
+  name: string;
+  platformRole: PlatformRole;
+  tenantId: string;
+  status: AccountStatus;
+  createdAt: string;
 }
 
 export interface StarCase {
@@ -183,14 +213,6 @@ export interface CompanyResearchResult {
   sources?: string[];
 }
 
-export interface MatchScores {
-  overall: number;
-  seo: number;
-  technical: number;
-  cultural: number;
-  leadership: number;
-}
-
 export interface SuggestedStory {
   knowledgeEntryId: string;
   title: string;
@@ -206,7 +228,6 @@ export interface AiQuestion {
 }
 
 export interface AiAnalysis {
-  matchScores: MatchScores;
   strengths: string[];
   risks: string[];
   interviewRisks: string[];
@@ -341,6 +362,24 @@ export interface ApplicationTemplate {
   updatedAt: string;
 }
 
+/** Uploaded recommendation letter that can be attached when sending an application */
+export interface Recommendation {
+  _id: string;
+  name: string;
+  /** Who wrote the recommendation, e.g. "Tidligere chef, Acme" */
+  from?: string;
+  notes?: string;
+  originalFile: FileRef;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DocumentPdfFile {
+  storageKey: string;
+  fileName: string;
+  fileId?: string;
+}
+
 export interface DocumentSet {
   _id: string;
   applicationId: string;
@@ -349,13 +388,13 @@ export interface DocumentSet {
   source: 'ai_generated' | 'manual_edit' | 'template_copy';
   cv: {
     content: string;
-    pdfFile?: { storageKey: string; fileName: string };
+    pdfFile?: DocumentPdfFile;
     basedOnTemplateId?: string;
     knowledgeEntriesUsed: string[];
   };
   coverLetter: {
     content: string;
-    pdfFile?: { storageKey: string; fileName: string };
+    pdfFile?: DocumentPdfFile;
     basedOnTemplateId?: string;
   };
   potentialImprovements?: string[];
@@ -408,6 +447,7 @@ export function isAiModelId(value: string): value is AiModelId {
 
 export interface Settings {
   _id: string;
+  tenantId: string;
   profile: {
     name: string;
     email: string;
@@ -421,10 +461,28 @@ export interface Settings {
     connectedEmail?: string;
   };
   preferences: {
-    defaultLanguage: string;
+    defaultLanguage: 'da' | 'en';
     aiModel: string;
   };
+  /**
+   * Optional override of the cover-letter generation instructions.
+   * When unset, DEFAULT_COVER_LETTER_PROMPT is used.
+   */
+  coverLetterPrompt?: string;
 }
+
+export {
+  DEFAULT_COVER_LETTER_PROMPT,
+  DEFAULT_COVER_LETTER_PROMPT_DA,
+  DEFAULT_COVER_LETTER_PROMPT_EN,
+  composeAiPrompt,
+  getDefaultCoverLetterPrompt,
+  isAppLanguage,
+  normalizeCoverLetterPrompt,
+  resolveCoverLetterPrompt,
+  sanitizeCoverLetterPrompt,
+  type AppLanguage,
+} from './aiPrompts';
 
 export interface DashboardData {
   pipeline: {

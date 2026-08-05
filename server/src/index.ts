@@ -1,31 +1,55 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import mongoose from 'mongoose';
 import { normalizeSkillConfidence } from '@career-intelligence/shared';
-import { config, assertR2Config } from './config';
+import { config, assertR2Config, assertJwtConfig } from './config';
 import { KnowledgeEntry } from './models';
+import { csrfProtection } from './auth/csrf';
+import authRouter from './routes/auth';
+import platformUsersRouter from './routes/platformUsers';
 import settingsRouter from './routes/settings';
 import companiesRouter from './routes/companies';
 import knowledgeRouter from './routes/knowledge';
 import cvTemplatesRouter from './routes/cvTemplates';
 import applicationTemplatesRouter from './routes/applicationTemplates';
+import recommendationsRouter from './routes/recommendations';
 import applicationsRouter from './routes/applications';
 import dashboardRouter from './routes/dashboard';
 
+assertJwtConfig();
+
 const app = express();
 
-app.use(cors({ origin: config.clientUrl }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Non-browser clients (no Origin) allowed for health checks etc.
+      if (!origin || config.allowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
+    },
+    credentials: true,
+  })
+);
 app.use(express.json({ limit: '2mb' }));
+app.use(cookieParser());
+app.use(csrfProtection);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', name: 'Jobhunter API' });
 });
 
+app.use('/api/auth', authRouter);
 app.use('/api/settings', settingsRouter);
+app.use('/api/platform/users', platformUsersRouter);
 app.use('/api/companies', companiesRouter);
 app.use('/api/knowledge', knowledgeRouter);
 app.use('/api/cv-templates', cvTemplatesRouter);
 app.use('/api/application-templates', applicationTemplatesRouter);
+app.use('/api/recommendations', recommendationsRouter);
 app.use('/api/applications', applicationsRouter);
 app.use('/api', dashboardRouter);
 

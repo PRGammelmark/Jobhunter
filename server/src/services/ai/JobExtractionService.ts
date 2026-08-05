@@ -1,9 +1,56 @@
+import type { Types } from 'mongoose';
 import OpenAI from 'openai';
 import { config } from '../../config';
 import {
   isWeakCompanyName,
   resolveCompanyName,
 } from '../scraper/companyNameResolver';
+import { composeAiPrompt } from '@career-intelligence/shared';
+
+const JOB_EXTRACTION_INSTRUCTIONS = `Du renser og strukturerer ét jobopslag fra rå sidetekst (scrapet HTML-tekst eller manuel paste).
+
+Regler:
+1. Behold KUN det intenderede/primære jobopslag.
+2. Ignorér og udelad: navigation, footers, cookies, share-widgets, "lignende jobs", "andre stillinger", anbefalede listings, søgeresultater, CTA-lister med andre jobtitler.
+3. description skal være den fulde opslagstekst for netop denne stilling i let markdown:
+   - Brug ## til overskrifter (fx "## Dine opgaver")
+   - Brug - til punktlister og 1. 2. 3. til nummererede lister
+   - Behold afsnit adskilt med blank linje
+   - Behold **fed** hvor det er meningsfuldt
+   - Undgå andre jobtitler / relaterede stillinger
+4. Opfind ikke fakta. Hvis et felt mangler, udelad det eller brug tom streng/array.
+5. language: "da" eller "en" (primært sprog i opslaget).
+6. summary: 1–3 sætninger (max ca. 400 tegn) der opsummerer stillingen (ren tekst, uden markdown).
+
+companyName (vigtigt):
+- Angiv den ANSÆTTENDE virksomhed / arbejdsgiveren — IKKE jobportalen, ATS'en eller mediets navn.
+- Brug ALDRIG Jobindex, LinkedIn, Indeed, Glassdoor, Ofir, Jobnet, TheHub, StepStone, hostname eller lignende som companyName.
+- Hvis scraper-hintet er en jobportal eller companyNameHintIsWeak=true, ignorer hintet og udled virksomheden fra opslagsteksten.
+- Prioritér tydelige indikationer i teksten, fx:
+  - "Hos Novo Nordisk søger vi..."
+  - "Acme A/S søger en..."
+  - "Vi er Contoso" / "Om Contoso" / "About Contoso"
+  - "Ansættende virksomhed: ..." / "Arbejdsgiver: ..." / "Company: ..."
+  - virksomhedsnavn i overskrift, byline eller kontaktblok
+  - e-mail-domæne (@acme.dk) når det klart pejer på arbejdsgiveren (ikke gmail/jobportal)
+- Hvis flere firmanavne nævnes, vælg den der ansætter til stillingen (ikke kunder, partnere eller værktøjer).
+- Bevar officiel stavemåde inkl. A/S, ApS, Group osv. når det fremgår.
+- Hvis virksomheden stadig ikke kan identificeres: sæt companyName til tom streng "".
+
+Returnér JSON:
+{
+  "title": "string",
+  "companyName": "string",
+  "location": "string eller tom",
+  "description": "string — kun det primære opslag (markdown med ##, lister og afsnit)",
+  "summary": "string",
+  "keyRequirements": ["string"],
+  "keyResponsibilities": ["string"],
+  "employmentType": "string eller tom",
+  "salary": "string eller tom",
+  "contactEmail": "string eller tom",
+  "language": "da" | "en"
+}`;
 
 export interface JobExtractionInput {
   title: string;
@@ -16,6 +63,7 @@ export interface JobExtractionInput {
   url?: string;
   /** Optional raw HTML for JSON-LD / DOM company signals */
   rawHtml?: string;
+  tenantId?: Types.ObjectId | string;
 }
 
 export interface ExtractedJob {
@@ -34,8 +82,24 @@ export interface ExtractedJob {
 
 const openai = config.openaiApiKey ? new OpenAI({ apiKey: config.openaiApiKey }) : null;
 
+/** Keep paragraph/line breaks; collapse only runs of spaces/tabs within lines. */
+function normalizeStructuredText(text: string): string {
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 function buildSummary(description: string, maxLength = 500): string {
-  const cleaned = description.replace(/\s+/g, ' ').trim();
+  const cleaned = description
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*]\s+/gm, '')
+    .replace(/^\s*\d+\.\s+/gm, '')
+    .replace(/\*\*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (cleaned.length <= maxLength) return cleaned;
   const slice = cleaned.slice(0, maxLength);
   const lastStop = Math.max(slice.lastIndexOf('. '), slice.lastIndexOf('! '), slice.lastIndexOf('? '));
@@ -73,7 +137,7 @@ function resolveBestCompanyName(
 }
 
 function fallbackExtract(input: JobExtractionInput): ExtractedJob {
-  const description = input.rawText.replace(/\s+/g, ' ').trim();
+  const description = normalizeStructuredText(input.rawText);
   return {
     title: input.title || 'Ukendt stilling',
     companyName: resolveBestCompanyName(input, undefined, description),
@@ -97,61 +161,24 @@ export class JobExtractionService {
 
     const scraperHintWeak = isWeakCompanyName(input.companyName);
 
-    const prompt = `Du renser og strukturerer ét jobopslag fra rå sidetekst (scrapet HTML-tekst eller manuel paste).
-
-Kilde: ${input.source || 'unknown'}
-URL: ${input.url || '(ingen)'}
-
-HINTS FRA SCRAPER:
-- title: ${input.title}
-- companyName: ${input.companyName || '(mangler / upålideligt)'}
-- companyNameHintIsWeak: ${scraperHintWeak}
-- location: ${input.location || '(ukendt)'}
-- keyRequirements (hint): ${JSON.stringify(input.keyRequirements || [])}
-- keyResponsibilities (hint): ${JSON.stringify(input.keyResponsibilities || [])}
-
-RÅ TEKST:
-${input.rawText.slice(0, 10000)}
-
-Regler:
-1. Behold KUN det intenderede/primære jobopslag.
-2. Ignorér og udelad: navigation, footers, cookies, share-widgets, "lignende jobs", "andre stillinger", anbefalede listings, søgeresultater, CTA-lister med andre jobtitler.
-3. description skal være den fulde, sammenhængende opslagstekst for netop denne stilling (behold afsnit; undgå andre jobtitler).
-4. Opfind ikke fakta. Hvis et felt mangler, udelad det eller brug tom streng/array.
-5. language: "da" eller "en" (primært sprog i opslaget).
-6. summary: 1–3 sætninger (max ca. 400 tegn) der opsummerer stillingen.
-
-companyName (vigtigt):
-- Angiv den ANSÆTTENDE virksomhed / arbejdsgiveren — IKKE jobportalen, ATS'en eller mediets navn.
-- Brug ALDRIG Jobindex, LinkedIn, Indeed, Glassdoor, Ofir, Jobnet, TheHub, StepStone, hostname eller lignende som companyName.
-- Hvis scraper-hintet er en jobportal eller companyNameHintIsWeak=true, ignorer hintet og udled virksomheden fra opslagsteksten.
-- Prioritér tydelige indikationer i teksten, fx:
-  - "Hos Novo Nordisk søger vi..."
-  - "Acme A/S søger en..."
-  - "Vi er Contoso" / "Om Contoso" / "About Contoso"
-  - "Ansættende virksomhed: ..." / "Arbejdsgiver: ..." / "Company: ..."
-  - virksomhedsnavn i overskrift, byline eller kontaktblok
-  - e-mail-domæne (@acme.dk) når det klart pejer på arbejdsgiveren (ikke gmail/jobportal)
-- Hvis flere firmanavne nævnes, vælg den der ansætter til stillingen (ikke kunder, partnere eller værktøjer).
-- Bevar officiel stavemåde inkl. A/S, ApS, Group osv. når det fremgår.
-- Hvis virksomheden stadig ikke kan identificeres: sæt companyName til tom streng "".
-
-Returnér JSON:
-{
-  "title": "string",
-  "companyName": "string",
-  "location": "string eller tom",
-  "description": "string — kun det primære opslag",
-  "summary": "string",
-  "keyRequirements": ["string"],
-  "keyResponsibilities": ["string"],
-  "employmentType": "string eller tom",
-  "salary": "string eller tom",
-  "contactEmail": "string eller tom",
-  "language": "da" | "en"
-}`;
-
     try {
+      const context = [
+        'KONTEKST:',
+        `Kilde: ${input.source || 'unknown'}`,
+        `URL: ${input.url || '(ingen)'}`,
+        'HINTS FRA SCRAPER:',
+        `- title: ${input.title}`,
+        `- companyName: ${input.companyName || '(mangler / upålideligt)'}`,
+        `- companyNameHintIsWeak: ${scraperHintWeak}`,
+        `- location: ${input.location || '(ukendt)'}`,
+        `- keyRequirements (hint): ${JSON.stringify(input.keyRequirements || [])}`,
+        `- keyResponsibilities (hint): ${JSON.stringify(input.keyResponsibilities || [])}`,
+        'RÅ TEKST:',
+        input.rawText.slice(0, 10000),
+      ].join('\n');
+
+      const prompt = composeAiPrompt(JOB_EXTRACTION_INSTRUCTIONS, context);
+
       const completion = await openai.chat.completions.create({
         model: config.aiModel,
         messages: [{ role: 'user', content: prompt }],
@@ -165,7 +192,7 @@ Returnér JSON:
       const parsed = JSON.parse(content) as Partial<ExtractedJob>;
       const description =
         typeof parsed.description === 'string' && parsed.description.trim().length > 40
-          ? parsed.description.replace(/\s+/g, ' ').trim()
+          ? normalizeStructuredText(parsed.description)
           : base.description;
 
       const language = parsed.language === 'en' || parsed.language === 'da' ? parsed.language : base.language;

@@ -1,0 +1,32 @@
+---
+description: UI copy must be bilingual via client i18n (da + en)
+alwaysApply: true
+---
+
+# UI translations (da + en)
+
+User-facing text belongs in the UI layer only. Keep Danish and English in sync.
+
+## Where strings live
+
+- Messages: `client/src/i18n/messages/da.ts` and `client/src/i18n/messages/en.ts`
+- Components use `useLocale()` → `t('key.path')` (and interpolation like `{{version}}` when needed)
+- Do not hardcode Danish or English UI copy in JSX/TSX
+- Do not put locale strings in the server API, models, or AI service layer for product UI
+
+```tsx
+// ❌ BAD
+<Button>Gem</Button>
+
+// ✅ GOOD
+const { t } = useLocale();
+<Button>{t('common.save')}</Button>
+```
+
+## When adding UI text
+
+1. Add the same key to both `da.ts` and `en.ts`
+2. Use the key via `t(...)` in the component
+3. Prefer nested keys that match the feature (`nav.*`, `settings.*`, etc.)
+
+Server may return stable machine values (status codes, enum keys). The client maps those to translated labels.

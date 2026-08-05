@@ -1,3 +1,4 @@
+import type { Types } from 'mongoose';
 import { Settings } from '../../models';
 import { sendGmailEmail } from './gmailService';
 import { sendOutlookEmail } from './outlookService';
@@ -12,9 +13,10 @@ export async function sendEmail(
   to: string,
   subject: string,
   body: string,
-  attachments: EmailAttachment[]
+  attachments: EmailAttachment[],
+  tenantId: Types.ObjectId | string
 ): Promise<{ messageId: string; provider: string }> {
-  const settings = await Settings.findById('app');
+  const settings = await Settings.findOne({ tenantId });
   const provider = (settings?.emailIntegration as { provider?: string })?.provider;
 
   if (!provider) {
@@ -23,9 +25,9 @@ export async function sendEmail(
 
   let messageId: string;
   if (provider === 'gmail') {
-    messageId = await sendGmailEmail(to, subject, body, attachments);
+    messageId = await sendGmailEmail(to, subject, body, attachments, tenantId);
   } else if (provider === 'outlook') {
-    messageId = await sendOutlookEmail(to, subject, body, attachments);
+    messageId = await sendOutlookEmail(to, subject, body, attachments, tenantId);
   } else {
     throw new Error(`Ukendt email-provider: ${provider}`);
   }
@@ -33,12 +35,12 @@ export async function sendEmail(
   return { messageId, provider };
 }
 
-export async function getEmailStatus(): Promise<{
+export async function getEmailStatus(tenantId: Types.ObjectId | string): Promise<{
   connected: boolean;
   provider: string | null;
   connectedEmail?: string;
 }> {
-  const settings = await Settings.findById('app');
+  const settings = await Settings.findOne({ tenantId });
   const integration = settings?.emailIntegration as {
     provider?: string | null;
     connectedEmail?: string;
@@ -51,8 +53,11 @@ export async function getEmailStatus(): Promise<{
   };
 }
 
-export async function disconnectEmail(): Promise<void> {
-  await Settings.findByIdAndUpdate('app', {
-    emailIntegration: { provider: null },
-  });
+export async function disconnectEmail(tenantId: Types.ObjectId | string): Promise<void> {
+  await Settings.findOneAndUpdate(
+    { tenantId },
+    {
+      emailIntegration: { provider: null },
+    }
+  );
 }

@@ -47,16 +47,12 @@ Til lokal udvikling uden R2: behold `STORAGE_TYPE=local` (filer gemmes i `./uplo
 
 ```bash
 cp .env.example .env
-# Tilføj OPENAI_API_KEY for fuld AI-funktionalitet
+# Tilføj JWT_SECRET og OPENAI_API_KEY
 ```
 
-### 5. Seed Knowledge Base
+Lokalt Mongo via Docker kører som single-node replica set (kræves til auth-setup-transaktioner). Atlas understøtter allerede transactions.
 
-```bash
-npm run seed
-```
-
-### 6. Start appen
+### 5. Start appen
 
 ```bash
 npm run dev
@@ -64,6 +60,8 @@ npm run dev
 
 - Frontend: http://localhost:5173
 - API: http://localhost:3001
+
+Første besøg: opret administrator via `/setup`. Øvrige brugere oprettes af admin under **Mere → Brugere** (hver bruger får egen tenant).
 
 ## Projektstruktur
 

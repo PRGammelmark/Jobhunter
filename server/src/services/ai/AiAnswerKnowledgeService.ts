@@ -1,7 +1,27 @@
+import type { Types } from 'mongoose';
 import OpenAI from 'openai';
 import { config } from '../../config';
 import { KnowledgeEntry } from '../../models';
-import { normalizeSkillConfidence, type KnowledgeEntryType } from '@career-intelligence/shared';
+import {
+  composeAiPrompt,
+  normalizeSkillConfidence,
+  type KnowledgeEntryType,
+} from '@career-intelligence/shared';
+
+const AI_ANSWER_KNOWLEDGE_INSTRUCTIONS = `Du strukturerer et svar fra en jobansøgnings-sparringspartner til Knowledge Base.
+
+Opret en Knowledge Base-entry baseret på svaret. Brug KUN information fra brugerens svar — opfind ikke nye fakta.
+
+Returnér JSON:
+{
+  "title": "kort, beskrivende titel (max 80 tegn)",
+  "type": "project" | "skill" | "education" | "achievement" | "story" | "employment",
+  "description": "opsummering af svaret i 2-4 sætninger, egnet til brug i ansøgninger",
+  "keywords": ["relevante", "nøgleord"],
+  "confidence": 1-5 (KUN hvis type er "skill" — ellers udelad feltet),
+  "whenToUse": "hvornår denne viden er relevant at fremhæve",
+  "results": ["konkrete resultater eller pointer fra svaret, hvis nogen"]
+}`;
 
 const openai = config.openaiApiKey ? new OpenAI({ apiKey: config.openaiApiKey }) : null;
 
@@ -16,9 +36,9 @@ export interface AnswerInput {
 }
 
 export class AiAnswerKnowledgeService {
-  async createFromAnswer(input: AnswerInput): Promise<string> {
+  async createFromAnswer(input: AnswerInput, tenantId: Types.ObjectId | string): Promise<string> {
     const entryData = openai ? await this.structureWithAi(input) : this.buildFallbackEntry(input);
-    const entry = await KnowledgeEntry.create(entryData);
+    const entry = await KnowledgeEntry.create({ ...entryData, tenantId });
     return entry._id.toString();
   }
 
@@ -42,26 +62,16 @@ export class AiAnswerKnowledgeService {
   }
 
   private async structureWithAi(input: AnswerInput) {
-    const prompt = `Du strukturerer et svar fra en jobansøgnings-sparringspartner til Knowledge Base.
+    const promptContext = [
+      'KONTEKST:',
+      `STILLING: ${input.jobTitle || 'Ukendt'}`,
+      `VIRKSOMHED: ${input.companyName || 'Ukendt'}`,
+      `AI-SPØRGSMÅL: ${input.question}`,
+      `KONTEKST (hvorfor AI spurgte): ${input.context || 'Ingen'}`,
+      `BRUGERENS SVAR: ${input.answer}`,
+    ].join('\n');
 
-STILLING: ${input.jobTitle || 'Ukendt'}
-VIRKSOMHED: ${input.companyName || 'Ukendt'}
-AI-SPØRGSMÅL: ${input.question}
-KONTEKST (hvorfor AI spurgte): ${input.context || 'Ingen'}
-BRUGERENS SVAR: ${input.answer}
-
-Opret en Knowledge Base-entry baseret på svaret. Brug KUN information fra brugerens svar — opfind ikke nye fakta.
-
-Returnér JSON:
-{
-  "title": "kort, beskrivende titel (max 80 tegn)",
-  "type": "project" | "skill" | "education" | "achievement" | "story" | "employment",
-  "description": "opsummering af svaret i 2-4 sætninger, egnet til brug i ansøgninger",
-  "keywords": ["relevante", "nøgleord"],
-  "confidence": 1-5 (KUN hvis type er "skill" — ellers udelad feltet),
-  "whenToUse": "hvornår denne viden er relevant at fremhæve",
-  "results": ["konkrete resultater eller pointer fra svaret, hvis nogen"]
-}`;
+    const prompt = composeAiPrompt(AI_ANSWER_KNOWLEDGE_INSTRUCTIONS, promptContext);
 
     const completion = await openai!.chat.completions.create({
       model: config.aiModel,

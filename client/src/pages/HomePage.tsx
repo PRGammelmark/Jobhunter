@@ -20,9 +20,11 @@ import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import BusinessIcon from '@mui/icons-material/Business';
 import { api } from '../services/api';
 import type { DashboardData } from '@career-intelligence/shared';
+import { useLocale } from '../i18n';
 
 export default function HomePage() {
   const navigate = useNavigate();
+  const { t } = useLocale();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -49,8 +51,8 @@ export default function HomePage() {
           <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 3 }}>
             <AddCircleOutlineIcon sx={{ fontSize: 40 }} />
             <Box>
-              <Typography variant="h6" fontWeight={700}>Nyt stillingsopslag</Typography>
-              <Typography variant="body2" sx={{ opacity: 0.8 }}>Indsæt joblink eller tekst</Typography>
+              <Typography variant="h6" fontWeight={700}>{t('home.newJobPosting')}</Typography>
+              <Typography variant="body2" sx={{ opacity: 0.8 }}>{t('home.newJobPostingHint')}</Typography>
             </Box>
           </CardContent>
         </CardActionArea>
@@ -58,19 +60,19 @@ export default function HomePage() {
 
       <Card>
         <CardContent>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>Pipeline</Typography>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>{t('home.pipeline')}</Typography>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
-            <Chip label={`${pipeline?.active ?? 0} aktive`} onClick={() => navigate('/pipeline')} />
-            <Chip label={`${pipeline?.readyToSend ?? 0} klar til send`} color="secondary" variant="outlined" onClick={() => navigate('/pipeline')} />
-            <Chip label={`${pipeline?.interviews ?? 0} interviews`} color="success" variant="outlined" onClick={() => navigate('/pipeline')} />
-            <Chip label={`${pipeline?.offers ?? 0} tilbud`} color="success" onClick={() => navigate('/pipeline')} />
+            <Chip label={t('home.active', { count: pipeline?.active ?? 0 })} onClick={() => navigate('/pipeline')} />
+            <Chip label={t('home.readyToSend', { count: pipeline?.readyToSend ?? 0 })} color="secondary" variant="outlined" onClick={() => navigate('/pipeline')} />
+            <Chip label={t('home.interviews', { count: pipeline?.interviews ?? 0 })} color="success" variant="outlined" onClick={() => navigate('/pipeline')} />
+            <Chip label={t('home.offers', { count: pipeline?.offers ?? 0 })} color="success" onClick={() => navigate('/pipeline')} />
           </Box>
         </CardContent>
       </Card>
 
       <Card>
         <CardContent>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>Dagens opgaver</Typography>
+          <Typography variant="subtitle2" color="text.secondary" gutterBottom>{t('home.todaysTasks')}</Typography>
           {data?.tasks.length ? (
             <List dense disablePadding>
               {data.tasks.map((task) => (
@@ -83,7 +85,16 @@ export default function HomePage() {
                       <RadioButtonUncheckedIcon fontSize="small" color="action" />
                     </ListItemIcon>
                     <ListItemText
-                      primary={task.label}
+                      primary={
+                        task.type === 'ai_question'
+                          ? (() => {
+                              const count = task.label.match(/\((\d+)\)/)?.[1];
+                              return count
+                                ? t('tasks.ai_question', { count: Number(count) })
+                                : t('tasks.ai_question_fallback');
+                            })()
+                          : t(`tasks.${task.type}`)
+                      }
                       secondary={task.companyName}
                       primaryTypographyProps={{ variant: 'body2' }}
                     />
@@ -92,7 +103,7 @@ export default function HomePage() {
               ))}
             </List>
           ) : (
-            <Typography variant="body2" color="text.secondary">Ingen opgaver lige nu</Typography>
+            <Typography variant="body2" color="text.secondary">{t('home.noTasks')}</Typography>
           )}
         </CardContent>
       </Card>
@@ -100,8 +111,8 @@ export default function HomePage() {
       <Card>
         <CardContent>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant="subtitle2" color="text.secondary">Nylige virksomheder</Typography>
-            <Button size="small" onClick={() => navigate('/companies')}>Se alle</Button>
+            <Typography variant="subtitle2" color="text.secondary">{t('home.recentCompanies')}</Typography>
+            <Button size="small" onClick={() => navigate('/companies')}>{t('home.seeAll')}</Button>
           </Box>
           {data?.recentCompanies.length ? (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 1 }}>
@@ -116,7 +127,7 @@ export default function HomePage() {
               ))}
             </Box>
           ) : (
-            <Typography variant="body2" color="text.secondary">Ingen virksomheder endnu</Typography>
+            <Typography variant="body2" color="text.secondary">{t('home.noCompanies')}</Typography>
           )}
           <Button
             variant="outlined"
@@ -125,13 +136,13 @@ export default function HomePage() {
             sx={{ mt: 1.5 }}
             onClick={() => navigate('/companies/new')}
           >
-            Ny virksomhed
+            {t('home.newCompany')}
           </Button>
         </CardContent>
       </Card>
 
       <Button variant="outlined" fullWidth onClick={() => navigate('/pipeline')}>
-        Se fuld pipeline
+        {t('home.seeFullPipeline')}
       </Button>
     </Box>
   );

@@ -1,17 +1,53 @@
+import type { Types } from 'mongoose';
 import OpenAI from 'openai';
 import { config } from '../../config';
 import { KnowledgeEntry, Application, DocumentSet, Settings, Company, CvTemplate, ApplicationTemplate } from '../../models';
 import { cvSelector } from './CvSelector';
-import { isAiModelId, normalizeSkillConfidence } from '@career-intelligence/shared';
+import { renderCoverLetterPrompt } from './promptResolver';
+import {
+  composeAiPrompt,
+  isAiModelId,
+  isAppLanguage,
+  normalizeSkillConfidence,
+  type AppLanguage,
+} from '@career-intelligence/shared';
+
+const COVER_LETTER_REVISE_INSTRUCTIONS_DA = `Opdater den følgende ansøgning på dansk ud fra brugerens ønskede ændringer.
+
+VIGTIGT:
+- Returnér KUN den opdaterede ansøgningstekst — ingen JSON, ingen forklaringer.
+- Anvend brugerens ønskede ændringer. Behold resten af ansøgningen, medmindre ændringerne kræver omskrivning.
+- Opfind ALDRIG nye historier, tal, resultater eller erfaringer. Brug kun det, der allerede står i ansøgningen, eller det der fremgår af kontekst nedenfor.
+- Start med præcis den overskrift der er angivet under KONTEKST (én linje, uden markdown).
+- Ingen meta-information i toppen: ingen dato, adresse, telefon, e-mail, LinkedIn eller afsenderblok.
+- Maksimalt 350–400 ord. Hold sproget naturligt, selvsikkert og professionelt.`;
+
+const COVER_LETTER_REVISE_INSTRUCTIONS_EN = `Update the following cover letter in English based on the user's requested changes.
+
+IMPORTANT:
+- Return ONLY the updated cover letter text — no JSON, no explanations.
+- Apply the user's requested changes. Keep the rest of the letter unless the changes require rewriting.
+- NEVER invent new stories, numbers, results or experience. Use only what is already in the letter, or what appears in the context below.
+- Start with exactly the heading given under CONTEXT (one line, no markdown).
+- No meta information at the top: no date, address, phone, email, LinkedIn or sender block.
+- Maximum 350–400 words. Keep the language natural, confident and professional.`;
+
+function coverLetterHeading(language: AppLanguage, title: string, company: string): string {
+  return language === 'en'
+    ? `Application: ${title} at ${company}`
+    : `Ansøgning: ${title} hos ${company}`;
+}
 
 const openai = config.openaiApiKey ? new OpenAI({ apiKey: config.openaiApiKey }) : null;
 
 export interface GenerateOptions {
+  tenantId: Types.ObjectId | string;
   cvTemplateId?: string;
   applicationTemplateId?: string;
 }
 
 export interface ReviseOptions {
+  tenantId: Types.ObjectId | string;
   instruction: string;
   documentSetId?: string;
 }
@@ -21,7 +57,7 @@ function normalizeCoverLetter(raw: string, heading: string): string {
   let body = raw.replace(/\r\n/g, '\n').trim();
 
   // Drop leading markdown/plain title lines about the application
-  body = body.replace(/^(?:#{1,6}\s*|\*\*)?Ansøgning\b[^\n]*(?:\*\*)?\n+/i, '');
+  body = body.replace(/^(?:#{1,6}\s*|\*\*)?(?:Ansøgning|Application)\b[^\n]*(?:\*\*)?\n+/i, '');
 
   // Drop common meta blocks before the letter body (date, address, contact lines)
   const metaLine =
@@ -52,22 +88,28 @@ function normalizeCoverLetter(raw: string, heading: string): string {
 }
 
 export class CoverLetterGenerator {
-  async generate(applicationId: string, options: GenerateOptions = {}): Promise<{ documentSetId: string }> {
-    const application = await Application.findById(applicationId);
+  async generate(applicationId: string, options: GenerateOptions): Promise<{ documentSetId: string }> {
+    const { tenantId } = options;
+    const application = await Application.findOne({ _id: applicationId, tenantId });
     if (!application) throw new Error('Ansøgning ikke fundet');
 
-    const settings = await Settings.findById('app') as {
+    const settings = await Settings.findOne({ tenantId }).lean() as {
       profile?: { name?: string };
       aboutMe?: string;
-      preferences?: { aiModel?: string };
+      preferences?: { aiModel?: string; defaultLanguage?: string };
+      coverLetterPrompt?: string;
+      aiPrompts?: { coverLetterGenerate?: string };
     } | null;
     const aboutMe = settings?.aboutMe?.trim() || '';
+    const language: AppLanguage = isAppLanguage(settings?.preferences?.defaultLanguage)
+      ? settings!.preferences!.defaultLanguage
+      : 'da';
     const preferredModel = settings?.preferences?.aiModel?.trim();
     const aiModel = preferredModel && isAiModelId(preferredModel) ? preferredModel : config.aiModel;
-    const entries = await KnowledgeEntry.find();
+    const entries = await KnowledgeEntry.find({ tenantId });
     const storyIds = (application.aiAnalysis as { suggestedStories?: Array<{ knowledgeEntryId: string }> })?.suggestedStories?.map((s) => s.knowledgeEntryId) || [];
     const usedEntries = storyIds.length
-      ? await KnowledgeEntry.find({ _id: { $in: storyIds } })
+      ? await KnowledgeEntry.find({ tenantId, _id: { $in: storyIds } })
       : entries.slice(0, 3);
 
     const kbBlock = usedEntries
@@ -95,44 +137,47 @@ export class CoverLetterGenerator {
 
     let cvTemplateId = options.cvTemplateId;
     if (cvTemplateId) {
-      const cvTemplate = await CvTemplate.findById(cvTemplateId);
+      const cvTemplate = await CvTemplate.findOne({ _id: cvTemplateId, tenantId });
       if (!cvTemplate) throw new Error('CV-skabelon ikke fundet');
     } else {
-      const cvSelection = await cvSelector.select(application.job.keyRequirements, application.aiAnalysis as never);
+      const cvSelection = await cvSelector.select(tenantId, application.job.keyRequirements, application.aiAnalysis as never);
       cvTemplateId = cvSelection.templateId;
     }
 
     let applicationTemplateId = options.applicationTemplateId;
     if (!applicationTemplateId) {
-      const defaultAppTemplate = await ApplicationTemplate.findOne({ isDefault: true });
+      const defaultAppTemplate = await ApplicationTemplate.findOne({ tenantId, isDefault: true });
       if (defaultAppTemplate) applicationTemplateId = defaultAppTemplate._id.toString();
     }
 
     let cvTemplateText = '';
     let cvTemplateName = '';
     if (cvTemplateId) {
-      const cvTemplate = await CvTemplate.findById(cvTemplateId);
+      const cvTemplate = await CvTemplate.findOne({ _id: cvTemplateId, tenantId });
       if (cvTemplate) {
         cvTemplateName = cvTemplate.name;
         if (cvTemplate.parsedContent?.rawText) {
           cvTemplateText = cvTemplate.parsedContent.rawText;
         }
       }
-      await CvTemplate.findByIdAndUpdate(cvTemplateId, { $inc: { 'stats.timesUsed': 1 } });
+      await CvTemplate.findOneAndUpdate({ _id: cvTemplateId, tenantId }, { $inc: { 'stats.timesUsed': 1 } });
     }
 
     let applicationTemplateText = '';
     if (applicationTemplateId) {
-      const appTemplate = await ApplicationTemplate.findById(applicationTemplateId);
+      const appTemplate = await ApplicationTemplate.findOne({ _id: applicationTemplateId, tenantId });
       if (appTemplate?.parsedContent?.rawText) {
         applicationTemplateText = appTemplate.parsedContent.rawText;
       }
-      await ApplicationTemplate.findByIdAndUpdate(applicationTemplateId, { $inc: { 'stats.timesUsed': 1 } });
+      await ApplicationTemplate.findOneAndUpdate(
+        { _id: applicationTemplateId, tenantId },
+        { $inc: { 'stats.timesUsed': 1 } }
+      );
     }
 
     let companyInfo = '';
     if (application.companyId) {
-      const company = await Company.findById(application.companyId);
+      const company = await Company.findOne({ _id: application.companyId, tenantId });
       if (company) {
         const parts = [
           company.description && `Beskrivelse: ${company.description}`,
@@ -143,67 +188,60 @@ export class CoverLetterGenerator {
       }
     }
 
-    const heading = `Ansøgning: ${application.job.title} hos ${application.job.companyName}`;
+    const heading = coverLetterHeading(language, application.job.title, application.job.companyName);
     let coverContent = '';
 
     if (openai) {
-      const prompt = `Skriv en målrettet ansøgning på dansk.
+      const candidateLabel = language === 'en' ? 'Candidate' : 'Kandidat';
+      const aboutEmpty = language === 'en' ? '(not filled in)' : '(ikke udfyldt)';
+      const context = [
+        language === 'en' ? 'CONTEXT:' : 'KONTEKST:',
+        language === 'en' ? `LANGUAGE: English` : `SPROG: Dansk`,
+        language === 'en' ? `HEADING: ${heading}` : `OVERSKRIFT: ${heading}`,
+        `PROFIL: ${settings?.profile?.name || candidateLabel}`,
+        language === 'en' ? `ROLE: ${application.job.title}` : `STILLING: ${application.job.title}`,
+        language === 'en'
+          ? `COMPANY: ${application.job.companyName}`
+          : `VIRKSOMHED: ${application.job.companyName}`,
+        companyInfo
+          ? language === 'en'
+            ? `COMPANY INFO:\n${companyInfo}`
+            : `VIRKSOMHEDSINFO:\n${companyInfo}`
+          : '',
+        language === 'en'
+          ? `JOB SUMMARY: ${application.job.summary || application.job.rawText?.slice(0, 2000) || ''}`
+          : `JOB-OPSUMMERING: ${application.job.summary || application.job.rawText?.slice(0, 2000) || ''}`,
+        application.job.keyRequirements?.length
+          ? `${language === 'en' ? 'KEY REQUIREMENTS' : 'NØGLEKRAV'}:\n${application.job.keyRequirements.map((r) => `- ${r}`).join('\n')}`
+          : '',
+        application.job.keyResponsibilities?.length
+          ? `${language === 'en' ? 'RESPONSIBILITIES' : 'ANSVAR'}:\n${application.job.keyResponsibilities.map((r) => `- ${r}`).join('\n')}`
+          : '',
+        language === 'en'
+          ? 'ABOUT ME (free text — use for tone, motivation and personal angle):'
+          : 'OM MIG (fri tekst — brug til tone, motivation og personlig vinkel):',
+        aboutMe || aboutEmpty,
+        'KNOWLEDGE BASE:',
+        kbBlock,
+        cvTemplateText || cvTemplateName
+          ? language === 'en'
+            ? `CV ATTACHED (context only — do not include in the response):\nName: ${cvTemplateName || 'CV'}\n${cvTemplateText}`
+            : `CV DER SENDES MED (kun kontekst — medtag ikke i svaret):\nNavn: ${cvTemplateName || 'CV'}\n${cvTemplateText}`
+          : '',
+        applicationTemplateText
+          ? language === 'en'
+            ? `APPLICATION TEMPLATE (use as tone, structure and style reference — adapt the content to the role and company):\n${applicationTemplateText}`
+            : `ANSØGNINGSSKABELON (brug som tone, struktur og stil-reference — tilpas indholdet til stillingen og virksomheden):\n${applicationTemplateText}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n');
 
-VIGTIGT: Brug KUN information fra Knowledge Base, Om mig, jobopslag og virksomhedsinfo. Opfind ALDRIG historier, tal eller resultater.
-Returnér KUN selve ansøgningsteksten — ingen JSON, ingen forklaringer, ingen CV.
-CV'et nedenfor er KUN kontekst: brug det til at vinkle ansøgningen skarpere og til at vide hvilket CV der sendes med. Kopiér ikke CV-indhold ind i ansøgningen. Genfortæl ikke CV'et — antag, at modtageren allerede har læst det.
-
-FORMAT:
-- Start med præcis denne overskrift (én linje, uden markdown): ${heading}
-- Ingen meta-information i toppen: ingen dato, adresse, telefon, e-mail, LinkedIn, afsenderblok eller lignende.
-- Gå direkte fra overskriften til selve brevet (fx "Kære ...").
-- Maksimalt 350–400 ord. Undgå lange lister og opremsninger.
-
-VINKEL OG INDHOLD:
-- Skriv med udgangspunkt i virksomheden og dens udfordringer – ikke kandidaten.
-- Besvar implicit to spørgsmål: Hvorfor denne virksomhed? og Hvorfor er jeg den rette til netop denne stilling?
-- Træk aktivt på kandidatens konkrete erfaringer, projekter og resultater, og vis hvordan de kan anvendes hos virksomheden.
-- Skriv kandidaten "ind i virksomheden": beskriv, hvordan vedkommende forventes at skabe værdi i netop denne rolle.
-- Vis, hvordan kandidaten kan bidrage – ikke blot hvad kandidaten har lavet tidligere.
-- Prioritér konkrete eksempler frem for generelle påstande. Vis hellere end fortæl.
-- Brug virksomhedens produkter, branche, kunder, teknologi og strategi aktivt i argumentationen, når det er relevant.
-- Lav tydelige koblinger mellem virksomhedens behov og kandidatens erfaring.
-- Vis forståelse for virksomhedens udfordringer og mål, hvis de kan udledes af stillingsopslaget eller virksomhedsprofilen.
-- Inddrag kun erfaringer, der er relevante for den konkrete stilling.
-- Fremhæv resultater, effekter og ansvar frem for blot teknologier og værktøjer.
-- Nævn kun teknologier, når de understøtter en konkret pointe eller et konkret resultat.
-- Hvis kandidaten mangler erfaring inden for et område, så fokuser på tilsvarende erfaring frem for at undskylde manglen.
-- Undgå generiske formuleringer, der kunne sendes til enhver virksomhed. Hold indholdet specifikt for både virksomheden og kandidatens erfaring.
-- Skriv altid, så ansøgningen føles skrevet specifikt til denne ene stilling.
-
-SPROG OG TONE:
-- Undgå standardformuleringer som "Jeg søger hermed...", "Jeg brænder for..." og "Jeg er passioneret omkring...".
-- Gør introduktionen fængende og nysgerrighedsskabende. Den første sætning skal give lyst til at læse videre.
-- Hold sproget naturligt, selvsikkert og professionelt – aldrig overdrevet eller pralende.
-- Undgå at skrive i et autoritativt eller bedrevidende toneleje. Antag aldrig, at virksomheden skal lære noget. Beskriv i stedet, hvordan ansøgerens erfaringer, observationer og arbejdsmetode passer til virksomheden.
-- Undgå buzzwords og floskler, medmindre de er centrale for stillingsopslaget.
-- Skriv i et aktivt sprog med korte, præcise sætninger.
-- Variér sætningslængde og ordvalg for at skabe et naturligt flow.
-- Tilpas tonen til virksomheden (startup, enterprise, offentlig sektor, bureau osv.).
-- Hvert afsnit skal have et tydeligt formål. Fjern alt, der ikke skaber værdi.
-- Skab en rød tråd fra introduktion til afslutning.
-- Afslut med en fremadskuende invitation til dialog frem for en passiv standardafslutning.
-
-PROFIL: ${settings?.profile?.name || 'Kandidat'}
-STILLING: ${application.job.title}
-VIRKSOMHED: ${application.job.companyName}
-${companyInfo ? `VIRKSOMHEDSINFO:\n${companyInfo}\n` : ''}
-JOB-OPSUMMERING: ${application.job.summary || application.job.rawText?.slice(0, 2000)}
-${application.job.keyRequirements?.length ? `NØGLEKRAV:\n${application.job.keyRequirements.map((r) => `- ${r}`).join('\n')}` : ''}
-${application.job.keyResponsibilities?.length ? `ANSVAR:\n${application.job.keyResponsibilities.map((r) => `- ${r}`).join('\n')}` : ''}
-
-OM MIG (fri tekst — brug til tone, motivation og personlig vinkel):
-${aboutMe || '(ikke udfyldt)'}
-
-KNOWLEDGE BASE:
-${kbBlock}
-${cvTemplateText || cvTemplateName ? `\nCV DER SENDES MED (kun kontekst — medtag ikke i svaret):\nNavn: ${cvTemplateName || 'CV'}\n${cvTemplateText}\n` : ''}
-${applicationTemplateText ? `\nANSØGNINGSSKABELON (brug som tone, struktur og stil-reference — tilpas indholdet til stillingen og virksomheden):\n${applicationTemplateText}\n` : ''}`;
+      const prompt = renderCoverLetterPrompt(
+        settings?.coverLetterPrompt || settings?.aiPrompts?.coverLetterGenerate,
+        context,
+        language
+      );
 
       const completion = await openai.chat.completions.create({
         model: aiModel,
@@ -211,6 +249,11 @@ ${applicationTemplateText ? `\nANSØGNINGSSKABELON (brug som tone, struktur og s
       });
 
       coverContent = (completion.choices[0]?.message?.content || '').trim();
+    } else if (language === 'en') {
+      coverContent = `Dear ${application.job.companyName},\n\nI am applying for the position as ${application.job.title}...\n\n`;
+      coverContent += `Relevant experience:\n${usedEntries.map((e) => `- ${e.title}: ${e.description.slice(0, 150)}`).join('\n')}\n\n`;
+      coverContent += `Kind regards,\n${settings?.profile?.name || ''}\n\n`;
+      coverContent += `_Add OPENAI_API_KEY for full generation._`;
     } else {
       coverContent = `Kære ${application.job.companyName},\n\nJeg søger stillingen som ${application.job.title}...\n\n`;
       coverContent += `Relevant erfaring:\n${usedEntries.map((e) => `- ${e.title}: ${e.description.slice(0, 150)}`).join('\n')}\n\n`;
@@ -220,10 +263,11 @@ ${applicationTemplateText ? `\nANSØGNINGSSKABELON (brug som tone, struktur og s
 
     coverContent = normalizeCoverLetter(coverContent, heading);
 
-    const lastVersion = await DocumentSet.findOne({ applicationId }).sort({ version: -1 });
+    const lastVersion = await DocumentSet.findOne({ tenantId, applicationId }).sort({ version: -1 });
     const version = (lastVersion?.version || 0) + 1;
 
     const docSet = await DocumentSet.create({
+      tenantId,
       applicationId,
       version,
       label: `Version ${version}`,
@@ -251,54 +295,62 @@ ${applicationTemplateText ? `\nANSØGNINGSSKABELON (brug som tone, struktur og s
    * Opretter en ny DocumentSet-version baseret på den valgte (eller aktive) version.
    */
   async revise(applicationId: string, options: ReviseOptions): Promise<{ documentSetId: string }> {
+    const { tenantId } = options;
     const instruction = options.instruction?.trim();
     if (!instruction) throw new Error('Angiv ønskede opdateringer');
 
-    const application = await Application.findById(applicationId);
+    const application = await Application.findOne({ _id: applicationId, tenantId });
     if (!application) throw new Error('Ansøgning ikke fundet');
 
     const sourceDoc = options.documentSetId
-      ? await DocumentSet.findOne({ _id: options.documentSetId, applicationId })
+      ? await DocumentSet.findOne({ _id: options.documentSetId, tenantId, applicationId })
       : application.activeDocumentSetId
-        ? await DocumentSet.findById(application.activeDocumentSetId)
-        : await DocumentSet.findOne({ applicationId }).sort({ version: -1 });
+        ? await DocumentSet.findOne({ _id: application.activeDocumentSetId, tenantId })
+        : await DocumentSet.findOne({ tenantId, applicationId }).sort({ version: -1 });
 
     if (!sourceDoc?.coverLetter?.content?.trim()) {
       throw new Error('Ingen ansøgning at opdatere');
     }
 
-    const settings = await Settings.findById('app') as {
+    const settings = await Settings.findOne({ tenantId }).lean() as {
       profile?: { name?: string };
       aboutMe?: string;
-      preferences?: { aiModel?: string };
+      preferences?: { aiModel?: string; defaultLanguage?: string };
     } | null;
+    const language: AppLanguage = isAppLanguage(settings?.preferences?.defaultLanguage)
+      ? settings!.preferences!.defaultLanguage
+      : 'da';
     const preferredModel = settings?.preferences?.aiModel?.trim();
     const aiModel = preferredModel && isAiModelId(preferredModel) ? preferredModel : config.aiModel;
     const aboutMe = settings?.aboutMe?.trim() || '';
-    const heading = `Ansøgning: ${application.job.title} hos ${application.job.companyName}`;
+    const heading = coverLetterHeading(language, application.job.title, application.job.companyName);
 
     let coverContent = '';
 
     if (openai) {
-      const prompt = `Opdater den følgende ansøgning på dansk ud fra brugerens ønskede ændringer.
+      const context = [
+        language === 'en' ? 'CONTEXT:' : 'KONTEKST:',
+        language === 'en' ? `LANGUAGE: English` : `SPROG: Dansk`,
+        language === 'en' ? `HEADING: ${heading}` : `OVERSKRIFT: ${heading}`,
+        language === 'en' ? `ROLE: ${application.job.title}` : `STILLING: ${application.job.title}`,
+        language === 'en'
+          ? `COMPANY: ${application.job.companyName}`
+          : `VIRKSOMHED: ${application.job.companyName}`,
+        language === 'en'
+          ? `JOB SUMMARY: ${application.job.summary || application.job.rawText?.slice(0, 1500) || ''}`
+          : `JOB-OPSUMMERING: ${application.job.summary || application.job.rawText?.slice(0, 1500) || ''}`,
+        aboutMe ? (language === 'en' ? `ABOUT ME:\n${aboutMe}` : `OM MIG:\n${aboutMe}`) : '',
+        language === 'en' ? 'CURRENT COVER LETTER:' : 'NUVÆRENDE ANSØGNING:',
+        sourceDoc.coverLetter.content,
+        language === 'en' ? 'REQUESTED CHANGES FROM THE USER:' : 'ØNSKEDE ÆNDRINGER FRA BRUGEREN:',
+        instruction,
+      ]
+        .filter(Boolean)
+        .join('\n\n');
 
-VIGTIGT:
-- Returnér KUN den opdaterede ansøgningstekst — ingen JSON, ingen forklaringer.
-- Anvend brugerens ønskede ændringer. Behold resten af ansøgningen, medmindre ændringerne kræver omskrivning.
-- Opfind ALDRIG nye historier, tal, resultater eller erfaringer. Brug kun det, der allerede står i ansøgningen, eller det der fremgår af kontekst nedenfor.
-- Start med præcis denne overskrift (én linje, uden markdown): ${heading}
-- Ingen meta-information i toppen: ingen dato, adresse, telefon, e-mail, LinkedIn eller afsenderblok.
-- Maksimalt 350–400 ord. Hold sproget naturligt, selvsikkert og professionelt.
-
-STILLING: ${application.job.title}
-VIRKSOMHED: ${application.job.companyName}
-JOB-OPSUMMERING: ${application.job.summary || application.job.rawText?.slice(0, 1500) || ''}
-${aboutMe ? `OM MIG:\n${aboutMe}\n` : ''}
-NUVÆRENDE ANSØGNING:
-${sourceDoc.coverLetter.content}
-
-ØNSKEDE ÆNDRINGER FRA BRUGEREN:
-${instruction}`;
+      const reviseInstructions =
+        language === 'en' ? COVER_LETTER_REVISE_INSTRUCTIONS_EN : COVER_LETTER_REVISE_INSTRUCTIONS_DA;
+      const prompt = composeAiPrompt(reviseInstructions, context);
 
       const completion = await openai.chat.completions.create({
         model: aiModel,
@@ -313,10 +365,11 @@ ${instruction}`;
 
     coverContent = normalizeCoverLetter(coverContent, heading);
 
-    const lastVersion = await DocumentSet.findOne({ applicationId }).sort({ version: -1 });
+    const lastVersion = await DocumentSet.findOne({ tenantId, applicationId }).sort({ version: -1 });
     const version = (lastVersion?.version || 0) + 1;
 
     const docSet = await DocumentSet.create({
+      tenantId,
       applicationId,
       version,
       label: `Version ${version}`,

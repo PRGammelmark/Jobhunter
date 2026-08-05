@@ -1,3 +1,4 @@
+import type { Types } from 'mongoose';
 import * as cheerio from 'cheerio';
 import { storageService } from '../storage/storageService';
 import {
@@ -89,6 +90,156 @@ function detectSource(url: string): string {
 
 function normalizeText(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
+}
+
+/** Keep paragraph/line breaks; collapse only runs of spaces/tabs within lines. */
+function normalizeStructuredText(text: string): string {
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/[^\S\n]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/**
+ * Convert a job-description HTML fragment to lightweight markdown:
+ * ## headings, - / 1. lists, paragraphs, **bold**.
+ */
+export function htmlToStructuredText(fragmentHtml: string): string {
+  if (!fragmentHtml) return '';
+  const $ = cheerio.load(fragmentHtml);
+  $('script, style, noscript, iframe, form').remove();
+
+  const BLOCK_TAGS = new Set([
+    'p',
+    'div',
+    'section',
+    'article',
+    'header',
+    'footer',
+    'main',
+    'aside',
+    'blockquote',
+    'pre',
+    'tr',
+  ]);
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function inlineText($el: cheerio.Cheerio<any>): string {
+    let out = '';
+    $el.contents().each((_, node: any) => {
+      if (node.type === 'text') {
+        out += (node.data || '').replace(/\s+/g, ' ');
+        return;
+      }
+      if (node.type !== 'tag') return;
+      const tag = String(node.name || '').toLowerCase();
+      const $child = $(node);
+      if (tag === 'br') {
+        out += '\n';
+        return;
+      }
+      if (tag === 'strong' || tag === 'b') {
+        const inner = inlineText($child).trim();
+        out += inner ? `**${inner}**` : '';
+        return;
+      }
+      if (tag === 'em' || tag === 'i') {
+        const inner = inlineText($child).trim();
+        out += inner ? `*${inner}*` : '';
+        return;
+      }
+      if (tag === 'a') {
+        out += inlineText($child);
+        return;
+      }
+      if (/^h[1-6]$/.test(tag) || tag === 'ul' || tag === 'ol' || tag === 'li' || BLOCK_TAGS.has(tag)) {
+        out += ` ${normalizeText($child.text())} `;
+        return;
+      }
+      out += inlineText($child);
+    });
+    return out;
+  }
+
+  function renderList(listEl: any, ordered: boolean): string {
+    const lines: string[] = [];
+    $(listEl)
+      .children('li')
+      .each((idx, li) => {
+        const text = normalizeText(inlineText($(li)));
+        if (!text) return;
+        lines.push(ordered ? `${idx + 1}. ${text}` : `- ${text}`);
+      });
+    return lines.length ? `\n\n${lines.join('\n')}\n\n` : '';
+  }
+
+  function walk(node: any): string {
+    if (!node) return '';
+    if (node.type === 'text') {
+      return (node.data || '').replace(/\s+/g, ' ');
+    }
+    if (node.type !== 'tag') return '';
+
+    const tag = String(node.name || '').toLowerCase();
+    const $el = $(node);
+
+    if (tag === 'br') return '\n';
+    if (/^h[1-6]$/.test(tag)) {
+      const heading = normalizeText(inlineText($el));
+      return heading ? `\n\n## ${heading}\n\n` : '';
+    }
+    if (tag === 'ul') return renderList(node, false);
+    if (tag === 'ol') return renderList(node, true);
+    if (tag === 'li') {
+      const text = normalizeText(inlineText($el));
+      return text ? `\n- ${text}\n` : '';
+    }
+    if (tag === 'strong' || tag === 'b') {
+      const inner = inlineText($el).trim();
+      return inner ? `**${inner}**` : '';
+    }
+    if (tag === 'em' || tag === 'i') {
+      const inner = inlineText($el).trim();
+      return inner ? `*${inner}*` : '';
+    }
+    if (tag === 'hr') return '\n\n';
+
+    if (BLOCK_TAGS.has(tag) || tag === 'body' || tag === 'html') {
+      const hasBlockChild = $el.children().toArray().some((child: any) => {
+        if (child.type !== 'tag') return false;
+        const t = String(child.name || '').toLowerCase();
+        return BLOCK_TAGS.has(t) || /^h[1-6]$/.test(t) || t === 'ul' || t === 'ol' || t === 'br';
+      });
+
+      if (hasBlockChild) {
+        let out = '';
+        $el.contents().each((_: number, child: any) => {
+          out += walk(child);
+        });
+        return out;
+      }
+
+      const text = normalizeText(inlineText($el));
+      return text ? `\n\n${text}\n\n` : '';
+    }
+
+    let out = '';
+    $el.contents().each((_: number, child: any) => {
+      out += walk(child);
+    });
+    return out;
+  }
+
+  let result = '';
+  $('body')
+    .contents()
+    .each((_: number, node: any) => {
+      result += walk(node);
+    });
+
+  return normalizeStructuredText(result);
 }
 
 function removeNoise($: cheerio.CheerioAPI): void {
@@ -190,12 +341,10 @@ function parseJobFields(html: string, url: string): Omit<ScrapedJob, 'rawHtml'> 
     ]) || undefined;
 
   const descriptionHtml = extractDescriptionHtml($);
-  let description = descriptionHtml
-    ? normalizeText(cheerio.load(descriptionHtml).text())
-    : '';
+  let description = descriptionHtml ? htmlToStructuredText(descriptionHtml) : '';
 
   if (!description) {
-    description = normalizeText($('body').text()).slice(0, 8000);
+    description = htmlToStructuredText($.html('body') || '').slice(0, 8000);
   } else if (description.length > 12000) {
     description = description.slice(0, 12000);
   }
@@ -245,7 +394,8 @@ function parseJobFields(html: string, url: string): Omit<ScrapedJob, 'rawHtml'> 
 }
 
 export async function scrapeJobUrl(
-  url: string
+  url: string,
+  tenantId: Types.ObjectId | string
 ): Promise<ScrapedJob & { archivedHtml: { storageKey: string; capturedAt: Date } }> {
   const response = await fetch(url, {
     headers: {
@@ -266,7 +416,7 @@ export async function scrapeJobUrl(
     Buffer.from(rawHtml, 'utf-8'),
     `job-${Date.now()}.html`,
     'text/html',
-    'jobs'
+    { tenantId, documentType: 'jobs' }
   );
 
   const companyName = !isWeakCompanyName(parsed.companyName)
@@ -291,16 +441,17 @@ export function parseManualJobText(
   companyName?: string,
   title?: string
 ): ScrapedJob {
-  const normalized = normalizeText(text);
+  const structured = normalizeStructuredText(text);
+  const flatForSignals = normalizeText(text);
   const resolved =
     (!isWeakCompanyName(companyName) && companyName?.trim()) ||
-    resolveCompanyName({ hint: companyName, text: normalized }) ||
+    resolveCompanyName({ hint: companyName, text: flatForSignals }) ||
     '';
 
   return {
     title: title || 'Manuelt indtastet stilling',
     companyName: resolved,
-    description: normalized,
+    description: structured,
     keyRequirements: [],
     keyResponsibilities: [],
     source: 'manual',

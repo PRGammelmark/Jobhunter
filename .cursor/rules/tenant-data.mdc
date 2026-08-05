@@ -1,0 +1,33 @@
+---
+description: All data fetch and mutation must be tenant-scoped
+alwaysApply: true
+---
+
+# Tenant-scoped data
+
+Every read, write, query, upload, and AI context that touches persisted data MUST be scoped to the current tenant. Never load or mutate another tenant's data by id alone.
+
+## Server
+
+- Take `tenantId` from the authenticated user (`req.user.tenantId`), not from the request body/query (except trusted admin/setup flows).
+- Include `tenantId` in every Mongo query filter and in every create payload.
+- Services that accept an id must also accept `tenantId` and use both: `{ _id, tenantId }`.
+
+```typescript
+// ❌ BAD — cross-tenant leak by id
+const app = await Application.findById(applicationId);
+
+// ✅ GOOD
+const app = await Application.findOne({ _id: applicationId, tenantId });
+```
+
+## Client / API
+
+- Do not send or trust a client-supplied `tenantId` for authorization.
+- Tenant is implied by the session/JWT; UI only works with the current user's data.
+
+## Checklist before shipping data work
+
+- [ ] All finds/updates/deletes filter on `tenantId`
+- [ ] New documents set `tenantId`
+- [ ] File/storage keys and AI prompts that embed user data are tenant-bound

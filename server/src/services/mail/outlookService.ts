@@ -1,10 +1,11 @@
+import type { Types } from 'mongoose';
 import { config } from '../../config';
 import { Settings } from '../../models';
 import { encrypt, decrypt } from '../crypto/tokenCrypto';
 
 const SCOPES = ['https://graph.microsoft.com/Mail.Send', 'offline_access', 'User.Read'];
 
-export function getOutlookAuthUrl(): string {
+export function getOutlookAuthUrl(state: string): string {
   if (!config.microsoft.clientId) throw new Error('MICROSOFT_CLIENT_ID ikke konfigureret');
   const params = new URLSearchParams({
     client_id: config.microsoft.clientId,
@@ -12,11 +13,15 @@ export function getOutlookAuthUrl(): string {
     redirect_uri: config.microsoft.redirectUri,
     scope: SCOPES.join(' '),
     response_mode: 'query',
+    state,
   });
   return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params}`;
 }
 
-export async function handleOutlookCallback(code: string): Promise<void> {
+export async function handleOutlookCallback(
+  code: string,
+  tenantId: Types.ObjectId | string
+): Promise<void> {
   const tokenRes = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -42,8 +47,8 @@ export async function handleOutlookCallback(code: string): Promise<void> {
   });
   const profile = (await profileRes.json()) as { mail?: string; userPrincipalName?: string };
 
-  await Settings.findByIdAndUpdate(
-    'app',
+  await Settings.findOneAndUpdate(
+    { tenantId },
     {
       emailIntegration: {
         provider: 'outlook',
@@ -59,8 +64,8 @@ export async function handleOutlookCallback(code: string): Promise<void> {
   );
 }
 
-async function getAccessToken(): Promise<string> {
-  const settings = await Settings.findById('app');
+async function getAccessToken(tenantId: Types.ObjectId | string): Promise<string> {
+  const settings = await Settings.findOne({ tenantId });
   const integration = settings?.emailIntegration as {
     provider?: string;
     accessToken?: string;
@@ -88,12 +93,15 @@ async function getAccessToken(): Promise<string> {
     if (!tokenRes.ok) throw new Error('Kunne ikke forny Outlook-token');
     const tokens = (await tokenRes.json()) as { access_token: string; expires_in?: number };
 
-    await Settings.findByIdAndUpdate('app', {
-      'emailIntegration.accessToken': encrypt(tokens.access_token),
-      'emailIntegration.tokenExpiresAt': tokens.expires_in
-        ? new Date(Date.now() + tokens.expires_in * 1000)
-        : undefined,
-    });
+    await Settings.findOneAndUpdate(
+      { tenantId },
+      {
+        'emailIntegration.accessToken': encrypt(tokens.access_token),
+        'emailIntegration.tokenExpiresAt': tokens.expires_in
+          ? new Date(Date.now() + tokens.expires_in * 1000)
+          : undefined,
+      }
+    );
 
     return tokens.access_token;
   }
@@ -105,9 +113,10 @@ export async function sendOutlookEmail(
   to: string,
   subject: string,
   body: string,
-  attachments: Array<{ filename: string; content: Buffer; mimeType: string }>
+  attachments: Array<{ filename: string; content: Buffer; mimeType: string }>,
+  tenantId: Types.ObjectId | string
 ): Promise<string> {
-  const accessToken = await getAccessToken();
+  const accessToken = await getAccessToken(tenantId);
 
   const message = {
     message: {

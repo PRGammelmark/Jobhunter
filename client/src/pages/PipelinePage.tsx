@@ -21,7 +21,8 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
 import WishlistButton from '../components/pipeline/WishlistButton';
-import { APPLICATION_STATUSES, STATUS_LABELS, type Application, type ApplicationStatus } from '@career-intelligence/shared';
+import { APPLICATION_STATUSES, type Application, type ApplicationStatus } from '@career-intelligence/shared';
+import { useLocale } from '../i18n';
 
 function TabCountLabel({ label, count }: { label: string; count: number }) {
   return (
@@ -52,6 +53,7 @@ function TabCountLabel({ label, count }: { label: string; count: number }) {
 
 export default function PipelinePage() {
   const navigate = useNavigate();
+  const { t } = useLocale();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | ApplicationStatus>('all');
@@ -102,7 +104,7 @@ export default function PipelinePage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} gutterBottom>Pipeline</Typography>
+      <Typography variant="h5" fontWeight={700} gutterBottom>{t('pipeline.title')}</Typography>
 
       <Tabs
         value={filter}
@@ -112,14 +114,14 @@ export default function PipelinePage() {
         sx={{ mb: 2 }}
       >
         <Tab
-          label={<TabCountLabel label="Alle" count={applications.length} />}
+          label={<TabCountLabel label={t('pipeline.all')} count={applications.length} />}
           value="all"
           sx={{ minWidth: 'auto', px: 1.5 }}
         />
         {APPLICATION_STATUSES.map((s) => (
           <Tab
             key={s}
-            label={<TabCountLabel label={STATUS_LABELS[s]} count={statusCounts[s]} />}
+            label={<TabCountLabel label={t(`status.${s}`)} count={statusCounts[s]} />}
             value={s}
             sx={{ minWidth: 'auto', px: 1.5 }}
           />
@@ -129,7 +131,7 @@ export default function PipelinePage() {
       {loading ? (
         [1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={100} sx={{ mb: 1 }} />)
       ) : filtered.length === 0 ? (
-        <Typography color="text.secondary">Ingen stillingsopslag i denne status</Typography>
+        <Typography color="text.secondary">{t('pipeline.empty')}</Typography>
       ) : (
         filtered.map((app) => (
           <Card key={app._id} sx={{ mb: 1.5 }}>
@@ -158,7 +160,7 @@ export default function PipelinePage() {
                 <IconButton
                   size="small"
                   color="error"
-                  aria-label={`Slet ${app.job.title}`}
+                  aria-label={t('pipeline.deleteAria', { title: app.job.title })}
                   onClick={(e) => {
                     e.stopPropagation();
                     setToDelete(app);
@@ -173,17 +175,21 @@ export default function PipelinePage() {
       )}
 
       <Dialog open={!!toDelete} onClose={() => !deleting && setToDelete(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>Slet stillingsopslag?</DialogTitle>
+        <DialogTitle>{t('pipeline.deleteTitle')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            Er du sikker på, at du vil slette <strong>{toDelete?.job.title}</strong>
-            {toDelete?.job.companyName ? <> hos <strong>{toDelete.job.companyName}</strong></> : null}? Dette kan ikke fortrydes.
+            {toDelete?.job.companyName
+              ? t('pipeline.deleteConfirm', {
+                  title: toDelete.job.title,
+                  company: toDelete.job.companyName,
+                })
+              : t('pipeline.deleteConfirmNoCompany', { title: toDelete?.job.title || '' })}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setToDelete(null)} disabled={deleting}>Annuller</Button>
+          <Button onClick={() => setToDelete(null)} disabled={deleting}>{t('common.cancel')}</Button>
           <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting}>
-            {deleting ? <CircularProgress size={16} /> : 'Slet'}
+            {deleting ? <CircularProgress size={16} /> : t('common.delete')}
           </Button>
         </DialogActions>
       </Dialog>

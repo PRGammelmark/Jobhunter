@@ -38,11 +38,11 @@ import SendIcon from '@mui/icons-material/Send';
 import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
+import { FormattedJobText } from '../components/FormattedJobText';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
 import WishlistButton from '../components/pipeline/WishlistButton';
-import MatchScoreBars from '../components/analysis/MatchScoreBars';
 import {
   type Application,
   type ApplicationStatus,
@@ -50,15 +50,18 @@ import {
   type Company,
   type CvTemplate,
   type DocumentSet,
+  type Recommendation,
   type InterviewContext,
   type InterviewRound,
   type InterviewType,
   type InterviewFormat,
 } from '@career-intelligence/shared';
+import { useLocale } from '../i18n';
 
 export default function ApplicationPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t, formatDateTime } = useLocale();
   const [app, setApp] = useState<Application | null>(null);
   const [company, setCompany] = useState<Company | null>(null);
   const [documents, setDocuments] = useState<DocumentSet[]>([]);
@@ -87,6 +90,8 @@ export default function ApplicationPage() {
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
   const [cvTemplates, setCvTemplates] = useState<CvTemplate[]>([]);
   const [appTemplates, setAppTemplates] = useState<ApplicationTemplate[]>([]);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<string[]>([]);
   const [selectedCvTemplateId, setSelectedCvTemplateId] = useState('');
   const [selectedAppTemplateId, setSelectedAppTemplateId] = useState('');
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
@@ -230,16 +235,29 @@ export default function ApplicationPage() {
 
   const displayCompanyName = company?.name || app.job.companyName;
 
-  const openEmailDialog = () => {
+  const openEmailDialog = async () => {
     setEmailForm({
       to: app.job.contactEmail || app.emailDraft?.to || '',
-      subject: app.emailDraft?.subject || `Ansøgning: ${app.job.title} — ${displayCompanyName}`,
+      subject: app.emailDraft?.subject || t('application.emailDraft.subject', { title: app.job.title, company: displayCompanyName }),
       body:
         app.emailDraft?.body ||
-        `Kære ${displayCompanyName},\n\nJeg søger hermed stillingen som ${app.job.title}.\n\nVedhæftet finder du mit CV og min ansøgning.\n\nMed venlig hilsen`,
+        t('application.emailDraft.body', { title: app.job.title, company: displayCompanyName }),
     });
+    setSelectedRecommendationIds([]);
     setEmailError('');
     setEmailDialog(true);
+    try {
+      const recs = await api.getRecommendations();
+      setRecommendations(recs);
+    } catch {
+      setRecommendations([]);
+    }
+  };
+
+  const toggleRecommendation = (id: string) => {
+    setSelectedRecommendationIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
   };
 
   const submitEmail = async () => {
@@ -251,11 +269,15 @@ export default function ApplicationPage() {
         await api.exportPdf(app._id, docId);
         setDocuments(await api.getDocuments(app._id));
       }
-      const result = await api.sendEmail(app._id, { ...emailForm, documentSetId: docId });
+      const result = await api.sendEmail(app._id, {
+        ...emailForm,
+        documentSetId: docId,
+        recommendationIds: selectedRecommendationIds,
+      });
       setApp(result.application);
       setEmailDialog(false);
     } catch (e) {
-      setEmailError(e instanceof Error ? e.message : 'Kunne ikke sende email');
+      setEmailError(e instanceof Error ? e.message : t('application.emailDialog.errorSend'));
     } finally {
       setActionLoading('');
     }
@@ -308,7 +330,7 @@ export default function ApplicationPage() {
 
   const saveEditedDocument = async (doc: DocumentSet) => {
     if (!editDraft.trim()) {
-      setDocActionError('Ansøgningstekst må ikke være tom');
+      setDocActionError(t('application.documents.errorEmptyCoverLetter'));
       return;
     }
     setActionLoading('save-doc');
@@ -323,7 +345,7 @@ export default function ApplicationPage() {
       setEditingDocId(null);
       setEditDraft('');
     } catch (e) {
-      setDocActionError(e instanceof Error ? e.message : 'Kunne ikke gemme ansøgning');
+      setDocActionError(e instanceof Error ? e.message : t('application.documents.errorSave'));
     } finally {
       setActionLoading('');
     }
@@ -345,7 +367,7 @@ export default function ApplicationPage() {
 
   const runReviseDocument = async (doc: DocumentSet) => {
     if (!reviseInstruction.trim()) {
-      setDocActionError('Angiv ønskede opdateringer');
+      setDocActionError(t('application.documents.errorReviseInstruction'));
       return;
     }
     setActionLoading('revise');
@@ -360,7 +382,7 @@ export default function ApplicationPage() {
       setReviseDocId(null);
       setReviseInstruction('');
     } catch (e) {
-      setDocActionError(e instanceof Error ? e.message : 'Kunne ikke opdatere ansøgning');
+      setDocActionError(e instanceof Error ? e.message : t('application.documents.errorRevise'));
     } finally {
       setActionLoading('');
     }
@@ -392,7 +414,7 @@ export default function ApplicationPage() {
         </Box>
         <IconButton
           size="small"
-          aria-label="Flere handlinger"
+          aria-label={t('application.actions.moreAria')}
           onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
           disabled={!!actionLoading || deleting}
         >
@@ -415,7 +437,7 @@ export default function ApplicationPage() {
             <ListItemIcon sx={{ color: 'inherit' }}>
               <DeleteOutlineIcon fontSize="small" />
             </ListItemIcon>
-            <ListItemText>Slet</ListItemText>
+            <ListItemText>{t('application.actions.delete')}</ListItemText>
           </MenuItem>
         </Menu>
       </Box>
@@ -429,7 +451,7 @@ export default function ApplicationPage() {
             onClick={runAnalyze}
             disabled={!!actionLoading}
           >
-            {hasAnalysis ? 'Opdatér analyse' : 'Analysér'}
+            {hasAnalysis ? t('application.actions.updateAnalysis') : t('application.actions.analyze')}
           </Button>
         )}
         {hasApplication ? (
@@ -439,7 +461,7 @@ export default function ApplicationPage() {
             onClick={() => setTab(3)}
             disabled={!!actionLoading}
           >
-            Se ansøgning
+            {t('application.actions.viewApplication')}
           </Button>
         ) : showGenerateButton ? (
           <Button
@@ -448,7 +470,7 @@ export default function ApplicationPage() {
             onClick={openGenerateDialog}
             disabled={!!actionLoading}
           >
-            Generér ansøgning
+            {t('application.actions.generateApplication')}
           </Button>
         ) : null}
         {hasApplication && (
@@ -459,7 +481,7 @@ export default function ApplicationPage() {
             onClick={() => runExportPdf(app.activeDocumentSetId || documents[0]?._id)}
             disabled={!!actionLoading}
           >
-            Export PDF
+            {t('application.actions.exportPdf')}
           </Button>
         )}
         {hasApplication && (
@@ -471,19 +493,19 @@ export default function ApplicationPage() {
             onClick={openEmailDialog}
             disabled={!!actionLoading}
           >
-            Send ansøgning
+            {t('application.actions.sendApplication')}
           </Button>
         )}
       </Box>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto" sx={{ mb: 2 }}>
-        <Tab label="Stilling" />
-        <Tab label="Virksomhed" />
-        <Tab label="Analyse" />
+        <Tab label={t('application.tabs.job')} />
+        <Tab label={t('application.tabs.company')} />
+        <Tab label={t('application.tabs.analysis')} />
         <Tab
           label={
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              Ansøgning
+              {t('application.tabs.application')}
               <Box
                 component="span"
                 sx={{
@@ -493,13 +515,13 @@ export default function ApplicationPage() {
                   bgcolor: hasApplication ? 'success.main' : 'action.disabled',
                   flexShrink: 0,
                 }}
-                aria-label={hasApplication ? 'Ansøgning findes' : 'Ingen ansøgning'}
+                aria-label={hasApplication ? t('application.tabs.applicationExistsAria') : t('application.tabs.applicationMissingAria')}
               />
             </Box>
           }
         />
-        <Tab label="Interview" />
-        <Tab label="Noter" />
+        <Tab label={t('application.tabs.interview')} />
+        <Tab label={t('application.tabs.notes')} />
       </Tabs>
 
       {tab === 0 && (
@@ -507,7 +529,7 @@ export default function ApplicationPage() {
           {analysis?.matchAssessment ? (
             <Card>
               <CardContent>
-                <Typography variant="subtitle2" gutterBottom>Match-vurdering</Typography>
+                <Typography variant="subtitle2" gutterBottom>{t('application.job.matchAssessment')}</Typography>
                 <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
                   {analysis.matchAssessment}
                 </Typography>
@@ -515,7 +537,7 @@ export default function ApplicationPage() {
             </Card>
           ) : !hasAnalysis ? (
             <Alert severity="info">
-              Match-vurdering kommer, når AI-analysen er kørt.
+              {t('application.job.matchAssessmentPending')}
             </Alert>
           ) : null}
           <Card>
@@ -523,13 +545,11 @@ export default function ApplicationPage() {
               {app.job.location && <Typography variant="body2" color="text.secondary">📍 {app.job.location}</Typography>}
               {app.job.url && (
                 <Typography variant="body2" sx={{ mt: 1 }}>
-                  <a href={app.job.url} target="_blank" rel="noreferrer">Åbn original opslag</a>
+                  <a href={app.job.url} target="_blank" rel="noreferrer">{t('application.job.openOriginal')}</a>
                 </Typography>
               )}
               <Divider sx={{ my: 2 }} />
-              <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                {app.job.rawText || app.job.summary || 'Intet indhold endnu'}
-              </Typography>
+              <FormattedJobText text={app.job.rawText || app.job.summary || ''} />
             </CardContent>
           </Card>
         </Box>
@@ -538,11 +558,11 @@ export default function ApplicationPage() {
       {tab === 1 && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {!company ? (
-            <Alert severity="info">Ingen virksomhed knyttet til dette stillingsopslag.</Alert>
+            <Alert severity="info">{t('application.company.noneLinked')}</Alert>
           ) : (
             <Card>
               <CardContent>
-                <Typography variant="subtitle2" gutterBottom>Virksomhedsinfo</Typography>
+                <Typography variant="subtitle2" gutterBottom>{t('application.company.info')}</Typography>
                 <Typography variant="h6" fontWeight={600} sx={{ mb: 1 }}>{company.name}</Typography>
                 {company.industry && <Chip label={company.industry} size="small" sx={{ mb: 1 }} />}
                 {company.description && (
@@ -553,27 +573,27 @@ export default function ApplicationPage() {
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mb: 1 }}>
                   {company.website ? (
                     <Link href={company.website} target="_blank" rel="noopener noreferrer" variant="body2">
-                      Virksomhedsside
+                      {t('application.company.website')}
                     </Link>
                   ) : (
                     <Typography variant="body2" color="text.secondary">
-                      Ingen virksomhedsside registreret
+                      {t('application.company.noWebsite')}
                     </Typography>
                   )}
                   {company.linkedIn && (
                     <Link href={company.linkedIn} target="_blank" rel="noopener noreferrer" variant="body2">
-                      LinkedIn
+                      {t('application.company.linkedIn')}
                     </Link>
                   )}
                   {company.employeeCount && (
-                    <Typography variant="body2" color="text.secondary">{company.employeeCount} ansatte</Typography>
+                    <Typography variant="body2" color="text.secondary">{t('application.company.employees', { count: company.employeeCount })}</Typography>
                   )}
                   {company.location && (
                     <Typography variant="body2" color="text.secondary">{company.location}</Typography>
                   )}
                 </Box>
                 <Button size="small" sx={{ mt: 1 }} onClick={() => navigate(`/companies/${company._id}`)}>
-                  Rediger virksomhedsinfo
+                  {t('application.company.editInfo')}
                 </Button>
               </CardContent>
             </Card>
@@ -584,14 +604,23 @@ export default function ApplicationPage() {
       {tab === 2 && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {!analysis ? (
-            <Alert severity="info">Kør AI-analyse for at se match-scores og sparringspartner-feedback.</Alert>
+            <Alert severity="info">{t('application.analysis.runPrompt')}</Alert>
           ) : (
             <>
-              <Card><CardContent><MatchScoreBars scores={analysis.matchScores} /></CardContent></Card>
+              {analysis.matchAssessment && (
+                <Card>
+                  <CardContent>
+                    <Typography variant="subtitle2" gutterBottom>{t('application.analysis.matchAssessment')}</Typography>
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                      {analysis.matchAssessment}
+                    </Typography>
+                  </CardContent>
+                </Card>
+              )}
 
               <Card>
                 <CardContent>
-                  <Typography variant="subtitle2" gutterBottom>Styrker</Typography>
+                  <Typography variant="subtitle2" gutterBottom>{t('application.analysis.strengths')}</Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                     {analysis.strengths.map((s) => <Chip key={s} label={s} color="success" size="small" variant="outlined" />)}
                   </Box>
@@ -600,7 +629,7 @@ export default function ApplicationPage() {
 
               <Card>
                 <CardContent>
-                  <Typography variant="subtitle2" gutterBottom>Risici</Typography>
+                  <Typography variant="subtitle2" gutterBottom>{t('application.analysis.risks')}</Typography>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                     {analysis.risks.map((r) => <Chip key={r} label={r} color="warning" size="small" variant="outlined" />)}
                   </Box>
@@ -610,7 +639,7 @@ export default function ApplicationPage() {
               {analysis.suggestedStories.length > 0 && (
                 <Card>
                   <CardContent>
-                    <Typography variant="subtitle2" gutterBottom>Historier at bruge</Typography>
+                    <Typography variant="subtitle2" gutterBottom>{t('application.analysis.storiesToUse')}</Typography>
                     <List dense>
                       {analysis.suggestedStories.map((s) => (
                         <ListItem key={s.knowledgeEntryId} disablePadding>
@@ -625,16 +654,16 @@ export default function ApplicationPage() {
               {analysis.aiQuestions.filter((q) => !q.answered).length > 0 && (
                 <Card>
                   <CardContent>
-                    <Typography variant="subtitle2" gutterBottom>Spørgsmål fra AI</Typography>
+                    <Typography variant="subtitle2" gutterBottom>{t('application.analysis.aiQuestions')}</Typography>
                     <FormControl fullWidth sx={{ mb: 2 }}>
-                      <InputLabel>Vælg spørgsmål</InputLabel>
-                      <Select value={selectedQuestion} label="Vælg spørgsmål" onChange={(e) => setSelectedQuestion(e.target.value)}>
+                      <InputLabel>{t('application.analysis.selectQuestion')}</InputLabel>
+                      <Select value={selectedQuestion} label={t('application.analysis.selectQuestion')} onChange={(e) => setSelectedQuestion(e.target.value)}>
                         {analysis.aiQuestions.filter((q) => !q.answered).map((q) => (
                           <MenuItem key={q.question} value={q.question}>{q.question}</MenuItem>
                         ))}
                       </Select>
                     </FormControl>
-                    <TextField fullWidth multiline rows={3} label="Dit svar" value={answer} onChange={(e) => setAnswer(e.target.value)} sx={{ mb: 1 }} />
+                    <TextField fullWidth multiline rows={3} label={t('application.analysis.yourAnswer')} value={answer} onChange={(e) => setAnswer(e.target.value)} sx={{ mb: 1 }} />
                     <FormControlLabel
                       control={
                         <Checkbox
@@ -642,24 +671,24 @@ export default function ApplicationPage() {
                           onChange={(e) => setSaveToKnowledge(e.target.checked)}
                         />
                       }
-                      label="Gem opsummering i Knowledge Base"
+                      label={t('application.analysis.saveToKnowledge')}
                       sx={{ mb: 1 }}
                     />
                     {answerSaved && (
                       <Alert severity="success" sx={{ mb: 1 }}>
                         {answerSaved === 'saved'
-                          ? 'Svar gemt på stillingsopslaget.'
+                          ? t('application.analysis.answerSavedOnJob')
                           : (
                             <>
-                              Gemt i Knowledge Base.{' '}
+                              {t('application.analysis.savedToKnowledge')}{' '}
                               <Button size="small" onClick={() => navigate(`/knowledge/${answerSaved}`)}>
-                                Se entry
+                                {t('application.analysis.viewEntry')}
                               </Button>
                             </>
                           )}
                       </Alert>
                     )}
-                    <Button variant="contained" onClick={submitAnswer} disabled={!selectedQuestion || !answer}>Gem svar</Button>
+                    <Button variant="contained" onClick={submitAnswer} disabled={!selectedQuestion || !answer}>{t('application.analysis.saveAnswer')}</Button>
                   </CardContent>
                 </Card>
               )}
@@ -673,8 +702,8 @@ export default function ApplicationPage() {
           {documents.length === 0 ? (
             <Alert severity="info">
               {showGenerateButton
-                ? 'Ingen ansøgning endnu. Klik "Generér ansøgning".'
-                : 'Ansøgningen genereres automatisk ved oprettelse. Hvis den mangler, prøv at oprette stillingen igen.'}
+                ? t('application.documents.emptyGenerate')
+                : t('application.documents.emptyAuto')}
             </Alert>
           ) : (
             <>
@@ -688,14 +717,16 @@ export default function ApplicationPage() {
                     <CardContent>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                         <Typography variant="subtitle1" fontWeight={600}>
-                          Version {doc.version}{doc.label && doc.label !== `Version ${doc.version}` ? ` — ${doc.label}` : ''}
+                          {doc.label && doc.label !== t('common.version', { version: doc.version })
+                            ? t('application.documents.versionWithLabel', { version: doc.version, label: doc.label })
+                            : t('common.version', { version: doc.version })}
                         </Typography>
-                        {isActive && <Chip label="Aktiv" size="small" color="primary" variant="outlined" />}
-                        {doc.source === 'manual_edit' && <Chip label="Manuel" size="small" variant="outlined" />}
-                        {doc.source === 'ai_generated' && <Chip label="AI" size="small" variant="outlined" />}
+                        {isActive && <Chip label={t('application.documents.active')} size="small" color="primary" variant="outlined" />}
+                        {doc.source === 'manual_edit' && <Chip label={t('application.documents.sourceManual')} size="small" variant="outlined" />}
+                        {doc.source === 'ai_generated' && <Chip label={t('application.documents.sourceAi')} size="small" variant="outlined" />}
                       </Box>
                       <Divider sx={{ my: 2 }} />
-                      <Typography variant="subtitle2" gutterBottom>Ansøgning</Typography>
+                      <Typography variant="subtitle2" gutterBottom>{t('application.documents.coverLetter')}</Typography>
                       {isEditing ? (
                         <TextField
                           fullWidth
@@ -714,16 +745,16 @@ export default function ApplicationPage() {
                       {isRevising && (
                         <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                           <Typography variant="subtitle2" gutterBottom>
-                            Opdatér med AI
+                            {t('application.documents.reviseWithAi')}
                           </Typography>
                           <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                            Beskriv hvad der skal ændres — fx tone, fokusis på bestemte erfaringer, eller kortere introduktion.
+                            {t('application.documents.reviseHelp')}
                           </Typography>
                           <TextField
                             fullWidth
                             multiline
                             minRows={3}
-                            placeholder="Fx: Gør introen kortere og nævn mere eksplicit mit arbejde med TypeScript hos Acme."
+                            placeholder={t('application.documents.revisePlaceholder')}
                             value={reviseInstruction}
                             onChange={(e) => setReviseInstruction(e.target.value)}
                             disabled={actionLoading === 'revise'}
@@ -737,29 +768,29 @@ export default function ApplicationPage() {
                               onClick={() => runReviseDocument(doc)}
                               disabled={!!actionLoading || !reviseInstruction.trim()}
                             >
-                              Opdatér
+                              {t('application.documents.update')}
                             </Button>
                             <Button size="small" onClick={cancelReviseDocument} disabled={actionLoading === 'revise'}>
-                              Annuller
+                              {t('application.documents.cancel')}
                             </Button>
                           </Box>
                         </Box>
                       )}
                       {doc.aiPromptSnapshot && (
                         <Alert severity="info" sx={{ mb: 2 }}>
-                          <Typography variant="caption" component="div" color="text.secondary">AI-instruktion</Typography>
+                          <Typography variant="caption" component="div" color="text.secondary">{t('application.documents.aiInstruction')}</Typography>
                           {doc.aiPromptSnapshot}
                         </Alert>
                       )}
                       {doc.cv.content?.trim() && (
                         <>
-                          <Typography variant="subtitle2">CV</Typography>
+                          <Typography variant="subtitle2">{t('application.documents.cv')}</Typography>
                           <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mb: 2 }}>{doc.cv.content}</Typography>
                         </>
                       )}
                       {doc.potentialImprovements && doc.potentialImprovements.length > 0 && (
                         <>
-                          <Typography variant="subtitle2" color="secondary">Potential improvements</Typography>
+                          <Typography variant="subtitle2" color="secondary">{t('application.documents.potentialImprovements')}</Typography>
                           <List dense>
                             {doc.potentialImprovements.map((imp) => (
                               <ListItem key={imp} disablePadding><ListItemText primary={`• ${imp}`} /></ListItem>
@@ -777,10 +808,10 @@ export default function ApplicationPage() {
                               disabled={!!actionLoading || !editDraft.trim()}
                               startIcon={actionLoading === 'save-doc' ? <CircularProgress size={16} /> : undefined}
                             >
-                              Gem som ny version
+                              {t('application.documents.saveAsNewVersion')}
                             </Button>
                             <Button size="small" onClick={cancelEditDocument} disabled={actionLoading === 'save-doc'}>
-                              Annuller
+                              {t('application.documents.cancel')}
                             </Button>
                           </>
                         ) : (
@@ -792,7 +823,7 @@ export default function ApplicationPage() {
                               onClick={() => startEditDocument(doc)}
                               disabled={!!actionLoading || isRevising}
                             >
-                              Rediger
+                              {t('application.documents.edit')}
                             </Button>
                             <Button
                               size="small"
@@ -801,19 +832,19 @@ export default function ApplicationPage() {
                               onClick={() => startReviseDocument(doc)}
                               disabled={!!actionLoading || isEditing}
                             >
-                              Opdatér med AI
+                              {t('application.documents.reviseWithAi')}
                             </Button>
                             <Button size="small" variant="outlined" startIcon={<PictureAsPdfIcon />} onClick={() => runExportPdf(doc._id)} disabled={!!actionLoading}>
-                              Generér PDF
+                              {t('application.documents.generatePdf')}
                             </Button>
-                            {doc.cv.pdfFile && (
-                              <Button size="small" href={`/api/files/${encodeURIComponent(doc.cv.pdfFile.storageKey)}`} target="_blank">
-                                Download CV
+                            {doc.cv.pdfFile?.fileId && (
+                              <Button size="small" href={`/api/files/${doc.cv.pdfFile.fileId}`} target="_blank">
+                                {t('application.documents.downloadCv')}
                               </Button>
                             )}
-                            {doc.coverLetter.pdfFile && (
-                              <Button size="small" href={`/api/files/${encodeURIComponent(doc.coverLetter.pdfFile.storageKey)}`} target="_blank">
-                                Download ansøgning
+                            {doc.coverLetter.pdfFile?.fileId && (
+                              <Button size="small" href={`/api/files/${doc.coverLetter.pdfFile.fileId}`} target="_blank">
+                                {t('application.documents.downloadCoverLetter')}
                               </Button>
                             )}
                             {canDeleteDocuments && (
@@ -825,7 +856,7 @@ export default function ApplicationPage() {
                                 onClick={() => setDocumentToDelete(doc)}
                                 disabled={deletingDocument || !!actionLoading}
                               >
-                                Slet ansøgning
+                                {t('application.documents.delete')}
                               </Button>
                             )}
                           </>
@@ -844,32 +875,32 @@ export default function ApplicationPage() {
         <Box>
           {!app.interviewPrep ? (
             <Alert severity="info" action={
-              <Button color="inherit" size="small" onClick={() => setInterviewDialog(true)}>Start prep</Button>
+              <Button color="inherit" size="small" onClick={() => setInterviewDialog(true)}>{t('application.interview.startPrep')}</Button>
             }>
-              Skift status til Samtale for at generere interview-forberedelse.
+              {t('application.interview.statusHint')}
             </Alert>
           ) : (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {company?.description && (
                 <Card><CardContent>
-                  <Typography variant="subtitle2">Virksomhedsinfo</Typography>
+                  <Typography variant="subtitle2">{t('application.interview.companyInfo')}</Typography>
                   <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{company.description}</Typography>
                 </CardContent></Card>
               )}
               <Card><CardContent>
-                <Typography variant="subtitle2">Virksomhedsresearch</Typography>
+                <Typography variant="subtitle2">{t('application.interview.companyResearch')}</Typography>
                 <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{app.interviewPrep.companyResearch}</Typography>
               </CardContent></Card>
               <Card><CardContent>
-                <Typography variant="subtitle2">Elevator pitch</Typography>
+                <Typography variant="subtitle2">{t('application.interview.elevatorPitch')}</Typography>
                 <Typography variant="body2">{app.interviewPrep.elevatorPitch}</Typography>
               </CardContent></Card>
               <Card><CardContent>
-                <Typography variant="subtitle2">Spørgsmål du bør stille</Typography>
+                <Typography variant="subtitle2">{t('application.interview.questionsToAsk')}</Typography>
                 <List dense>{app.interviewPrep.questionsToAsk.map((q) => <ListItem key={q} disablePadding><ListItemText primary={q} /></ListItem>)}</List>
               </CardContent></Card>
               <Card><CardContent>
-                <Typography variant="subtitle2">Sandsynlige spørgsmål</Typography>
+                <Typography variant="subtitle2">{t('application.interview.likelyQuestions')}</Typography>
                 <List dense>{app.interviewPrep.likelyQuestions.map((q) => <ListItem key={q} disablePadding><ListItemText primary={q} /></ListItem>)}</List>
               </CardContent></Card>
             </Box>
@@ -880,13 +911,13 @@ export default function ApplicationPage() {
       {tab === 5 && (
         <Box>
           <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-            <TextField fullWidth size="small" placeholder="Tilføj note..." value={note} onChange={(e) => setNote(e.target.value)} />
-            <Button variant="contained" onClick={addNote}>Tilføj</Button>
+            <TextField fullWidth size="small" placeholder={t('application.notes.placeholder')} value={note} onChange={(e) => setNote(e.target.value)} />
+            <Button variant="contained" onClick={addNote}>{t('application.notes.add')}</Button>
           </Box>
           <List>
             {app.notes.map((n) => (
               <ListItem key={n._id} alignItems="flex-start">
-                <ListItemText primary={n.text} secondary={new Date(n.createdAt).toLocaleString('da-DK')} />
+                <ListItemText primary={n.text} secondary={formatDateTime(n.createdAt)} />
               </ListItem>
             ))}
           </List>
@@ -894,50 +925,50 @@ export default function ApplicationPage() {
       )}
 
       <Dialog open={generateDialog} onClose={() => !actionLoading && setGenerateDialog(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Generér ansøgning</DialogTitle>
+        <DialogTitle>{t('application.generateDialog.title')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <Typography variant="body2" color="text.secondary">
-            Vælg hvilke skabeloner AI skal tage udgangspunkt i. Lad feltet være tomt for automatisk valg.
+            {t('application.generateDialog.help')}
           </Typography>
           <FormControl fullWidth>
-            <InputLabel>CV-skabelon</InputLabel>
+            <InputLabel>{t('application.generateDialog.cvTemplate')}</InputLabel>
             <Select
               value={selectedCvTemplateId}
-              label="CV-skabelon"
+              label={t('application.generateDialog.cvTemplate')}
               onChange={(e) => setSelectedCvTemplateId(e.target.value)}
             >
-              <MenuItem value="">Automatisk valg</MenuItem>
+              <MenuItem value="">{t('application.generateDialog.automatic')}</MenuItem>
               {cvTemplates.map((cv) => (
                 <MenuItem key={cv._id} value={cv._id}>
-                  {cv.name}{cv.isDefault ? ' (default)' : ''}
+                  {cv.name}{cv.isDefault ? t('application.generateDialog.defaultSuffix') : ''}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
           <FormControl fullWidth>
-            <InputLabel>Ansøgningsskabelon</InputLabel>
+            <InputLabel>{t('application.generateDialog.appTemplate')}</InputLabel>
             <Select
               value={selectedAppTemplateId}
-              label="Ansøgningsskabelon"
+              label={t('application.generateDialog.appTemplate')}
               onChange={(e) => setSelectedAppTemplateId(e.target.value)}
             >
-              <MenuItem value="">Ingen skabelon</MenuItem>
-              {appTemplates.map((t) => (
-                <MenuItem key={t._id} value={t._id}>
-                  {t.name}{t.isDefault ? ' (default)' : ''}
+              <MenuItem value="">{t('application.generateDialog.noTemplate')}</MenuItem>
+              {appTemplates.map((template) => (
+                <MenuItem key={template._id} value={template._id}>
+                  {template.name}{template.isDefault ? t('application.generateDialog.defaultSuffix') : ''}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
           {cvTemplates.length === 0 && appTemplates.length === 0 && (
             <Alert severity="info">
-              Du har ingen skabeloner endnu. Gå til CV &amp; templates for at uploade eller oprette dem.
+              {t('application.generateDialog.noTemplatesAlert')}
             </Alert>
           )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setGenerateDialog(false)} disabled={actionLoading === 'generate'}>
-            Annuller
+            {t('application.generateDialog.cancel')}
           </Button>
           <Button
             variant="contained"
@@ -945,42 +976,85 @@ export default function ApplicationPage() {
             disabled={actionLoading === 'generate'}
             startIcon={actionLoading === 'generate' ? <CircularProgress size={16} /> : undefined}
           >
-            Generér
+            {t('application.generateDialog.generate')}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={emailDialog} onClose={() => setEmailDialog(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Send ansøgning</DialogTitle>
+        <DialogTitle>{t('application.emailDialog.title')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           {emailError && <Alert severity="error">{emailError}</Alert>}
-          <TextField label="Til" fullWidth value={emailForm.to} onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })} />
-          <TextField label="Emne" fullWidth value={emailForm.subject} onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })} />
-          <TextField label="Besked" fullWidth multiline rows={8} value={emailForm.body} onChange={(e) => setEmailForm({ ...emailForm, body: e.target.value })} />
+          <TextField label={t('application.emailDialog.to')} fullWidth value={emailForm.to} onChange={(e) => setEmailForm({ ...emailForm, to: e.target.value })} />
+          <TextField label={t('application.emailDialog.subject')} fullWidth value={emailForm.subject} onChange={(e) => setEmailForm({ ...emailForm, subject: e.target.value })} />
+          <TextField label={t('application.emailDialog.body')} fullWidth multiline rows={8} value={emailForm.body} onChange={(e) => setEmailForm({ ...emailForm, body: e.target.value })} />
+          <Box>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+              {t('application.emailDialog.attachRecommendations')}
+            </Typography>
+            {recommendations.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                {t('application.emailDialog.noRecommendations')}
+              </Typography>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                {recommendations.map((rec) => (
+                  <FormControlLabel
+                    key={rec._id}
+                    control={
+                      <Checkbox
+                        checked={selectedRecommendationIds.includes(rec._id)}
+                        onChange={() => toggleRecommendation(rec._id)}
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography variant="body2">{rec.name}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {rec.from ? `${rec.from} · ` : ''}
+                          {rec.originalFile.fileName}
+                        </Typography>
+                      </Box>
+                    }
+                  />
+                ))}
+              </Box>
+            )}
+          </Box>
           <Typography variant="caption" color="text.secondary">
-            CV og ansøgning vedhæftes automatisk som PDF. Kræver forbundet Gmail/Outlook i Indstillinger.
+            {t('application.emailDialog.footerBase')}
+            {selectedRecommendationIds.length > 0
+              ? t(
+                  selectedRecommendationIds.length === 1
+                    ? 'application.emailDialog.footerRecsSingular'
+                    : 'application.emailDialog.footerRecsPlural',
+                  { count: selectedRecommendationIds.length }
+                )
+              : ''}
+            {t('application.emailDialog.footerSettings')}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setEmailDialog(false)}>Annuller</Button>
+          <Button onClick={() => setEmailDialog(false)}>{t('application.emailDialog.cancel')}</Button>
           <Button variant="contained" onClick={submitEmail} disabled={!!actionLoading || !emailForm.to}>
-            Send
+            {t('application.emailDialog.send')}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={deleteDialog} onClose={() => !deleting && setDeleteDialog(false)} maxWidth="xs" fullWidth>
-        <DialogTitle>Slet stillingsopslag?</DialogTitle>
+        <DialogTitle>{t('application.deleteJob.title')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            Er du sikker på, at du vil slette <strong>{app.job.title}</strong>
-            {displayCompanyName ? <> hos <strong>{displayCompanyName}</strong></> : null}? Dette kan ikke fortrydes.
+            {displayCompanyName
+              ? t('application.deleteJob.confirm', { title: app.job.title, company: displayCompanyName })
+              : t('application.deleteJob.confirmNoCompany', { title: app.job.title })}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDeleteDialog(false)} disabled={deleting}>Annuller</Button>
+          <Button onClick={() => setDeleteDialog(false)} disabled={deleting}>{t('application.deleteJob.cancel')}</Button>
           <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting}>
-            {deleting ? <CircularProgress size={16} /> : 'Slet'}
+            {deleting ? <CircularProgress size={16} /> : t('application.deleteJob.confirmAction')}
           </Button>
         </DialogActions>
       </Dialog>
@@ -991,53 +1065,51 @@ export default function ApplicationPage() {
         maxWidth="xs"
         fullWidth
       >
-        <DialogTitle>Slet ansøgning?</DialogTitle>
+        <DialogTitle>{t('application.deleteDoc.title')}</DialogTitle>
         <DialogContent>
           <Typography variant="body2">
-            Er du sikker på, at du vil slette{' '}
-            <strong>
-              Version {documentToDelete?.version}
-              {documentToDelete?.label ? ` — ${documentToDelete.label}` : ''}
-            </strong>
-            ? Dette kan ikke fortrydes.
+            {t('application.deleteDoc.confirm', {
+              version: documentToDelete?.version || '',
+              labelSuffix: documentToDelete?.label ? ` — ${documentToDelete.label}` : '',
+            })}
           </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setDocumentToDelete(null)} disabled={deletingDocument}>Annuller</Button>
+          <Button onClick={() => setDocumentToDelete(null)} disabled={deletingDocument}>{t('application.deleteDoc.cancel')}</Button>
           <Button variant="contained" color="error" onClick={confirmDeleteDocument} disabled={deletingDocument}>
-            {deletingDocument ? <CircularProgress size={16} /> : 'Slet'}
+            {deletingDocument ? <CircularProgress size={16} /> : t('application.deleteDoc.confirmAction')}
           </Button>
         </DialogActions>
       </Dialog>
 
       <Dialog open={interviewDialog} onClose={() => setInterviewDialog(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Hvilken samtale er det?</DialogTitle>
+        <DialogTitle>{t('application.interviewDialog.title')}</DialogTitle>
         <DialogContent>
-          <Typography variant="subtitle2" sx={{ mt: 1 }}>Runde</Typography>
+          <Typography variant="subtitle2" sx={{ mt: 1 }}>{t('application.interviewDialog.round')}</Typography>
           <RadioGroup value={interviewContext.round} onChange={(e) => setInterviewContext({ ...interviewContext, round: e.target.value as InterviewRound })}>
-            <FormControlLabel value="first" control={<Radio />} label="Første samtale" />
-            <FormControlLabel value="second" control={<Radio />} label="Anden samtale" />
-            <FormControlLabel value="third" control={<Radio />} label="Tredje samtale" />
-            <FormControlLabel value="final" control={<Radio />} label="Finale" />
+            <FormControlLabel value="first" control={<Radio />} label={t('application.interviewDialog.roundFirst')} />
+            <FormControlLabel value="second" control={<Radio />} label={t('application.interviewDialog.roundSecond')} />
+            <FormControlLabel value="third" control={<Radio />} label={t('application.interviewDialog.roundThird')} />
+            <FormControlLabel value="final" control={<Radio />} label={t('application.interviewDialog.roundFinal')} />
           </RadioGroup>
-          <Typography variant="subtitle2" sx={{ mt: 2 }}>Type</Typography>
+          <Typography variant="subtitle2" sx={{ mt: 2 }}>{t('application.interviewDialog.type')}</Typography>
           <RadioGroup value={interviewContext.type} onChange={(e) => setInterviewContext({ ...interviewContext, type: e.target.value as InterviewType })}>
-            <FormControlLabel value="general" control={<Radio />} label="Generel" />
-            <FormControlLabel value="technical" control={<Radio />} label="Teknisk interview" />
-            <FormControlLabel value="case" control={<Radio />} label="Case" />
-            <FormControlLabel value="hr" control={<Radio />} label="HR / kultur" />
+            <FormControlLabel value="general" control={<Radio />} label={t('application.interviewDialog.typeGeneral')} />
+            <FormControlLabel value="technical" control={<Radio />} label={t('application.interviewDialog.typeTechnical')} />
+            <FormControlLabel value="case" control={<Radio />} label={t('application.interviewDialog.typeCase')} />
+            <FormControlLabel value="hr" control={<Radio />} label={t('application.interviewDialog.typeHr')} />
           </RadioGroup>
-          <Typography variant="subtitle2" sx={{ mt: 2 }}>Format</Typography>
+          <Typography variant="subtitle2" sx={{ mt: 2 }}>{t('application.interviewDialog.format')}</Typography>
           <RadioGroup value={interviewContext.format} onChange={(e) => setInterviewContext({ ...interviewContext, format: e.target.value as InterviewFormat })}>
-            <FormControlLabel value="online" control={<Radio />} label="Online" />
-            <FormControlLabel value="physical" control={<Radio />} label="Fysisk" />
-            <FormControlLabel value="hybrid" control={<Radio />} label="Hybrid" />
+            <FormControlLabel value="online" control={<Radio />} label={t('application.interviewDialog.formatOnline')} />
+            <FormControlLabel value="physical" control={<Radio />} label={t('application.interviewDialog.formatPhysical')} />
+            <FormControlLabel value="hybrid" control={<Radio />} label={t('application.interviewDialog.formatHybrid')} />
           </RadioGroup>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setInterviewDialog(false)}>Annuller</Button>
+          <Button onClick={() => setInterviewDialog(false)}>{t('application.interviewDialog.cancel')}</Button>
           <Button variant="contained" onClick={submitInterviewPrep} disabled={actionLoading === 'interview'}>
-            Generér interview-prep
+            {t('application.interviewDialog.generatePrep')}
           </Button>
         </DialogActions>
       </Dialog>

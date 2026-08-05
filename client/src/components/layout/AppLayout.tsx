@@ -16,23 +16,26 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import AddIcon from '@mui/icons-material/Add';
 import { useState } from 'react';
+import { useLocale } from '../../i18n';
+import LanguageSwitcher from './LanguageSwitcher';
 import MoreMenu from './MoreMenu';
-
-const NAV_ITEMS = [
-  { label: 'Hjem', value: '/', icon: <HomeIcon /> },
-  { label: 'Pipeline', value: '/pipeline', icon: <ViewKanbanIcon /> },
-  { label: 'Knowledge', value: '/knowledge', icon: <PsychologyIcon /> },
-  { label: 'CV & templates', value: '/cv', icon: <DescriptionIcon /> },
-  { label: 'Mere', value: 'more', icon: <MoreHorizIcon /> },
-];
 
 export default function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [moreOpen, setMoreOpen] = useState(false);
+  const { t } = useLocale();
+  const [moreAnchorEl, setMoreAnchorEl] = useState<HTMLElement | null>(null);
+
+  const navItems = [
+    { label: t('nav.home'), value: '/', icon: <HomeIcon /> },
+    { label: t('nav.pipeline'), value: '/pipeline', icon: <ViewKanbanIcon /> },
+    { label: t('nav.knowledge'), value: '/knowledge', icon: <PsychologyIcon /> },
+    { label: t('nav.cvTemplates'), value: '/cv', icon: <DescriptionIcon /> },
+    { label: t('nav.more'), value: 'more', icon: <MoreHorizIcon /> },
+  ];
 
   const currentNav =
-    NAV_ITEMS.find((item) => item.value !== 'more' && location.pathname.startsWith(item.value) && item.value !== '/')
+    navItems.find((item) => item.value !== 'more' && location.pathname.startsWith(item.value) && item.value !== '/')
       ?.value ||
     (location.pathname === '/' ? '/' : 'more');
 
@@ -46,6 +49,7 @@ export default function AppLayout() {
           <Typography variant="h6" fontWeight={700} sx={{ flexGrow: 1 }}>
             Jobhunter
           </Typography>
+          <LanguageSwitcher />
         </Toolbar>
       </AppBar>
 
@@ -57,12 +61,12 @@ export default function AppLayout() {
         <Fab
           variant="extended"
           color="secondary"
-          aria-label="Nyt stillingsopslag"
+          aria-label={t('nav.newJobPosting')}
           sx={{ position: 'fixed', bottom: 80, right: 16, zIndex: 1100 }}
           onClick={() => navigate('/new')}
         >
           <AddIcon sx={{ mr: 1 }} />
-          Nyt stillingsopslag
+          {t('nav.newJobPosting')}
         </Fab>
       )}
 
@@ -71,17 +75,30 @@ export default function AppLayout() {
           showLabels
           value={currentNav}
           onChange={(_, value) => {
-            if (value === 'more') setMoreOpen(true);
-            else navigate(value);
+            if (value !== 'more') navigate(value);
           }}
         >
-          {NAV_ITEMS.map((item) => (
-            <BottomNavigationAction key={item.value} label={item.label} value={item.value} icon={item.icon} />
+          {navItems.map((item) => (
+            <BottomNavigationAction
+              key={item.value}
+              label={item.label}
+              value={item.value}
+              icon={item.icon}
+              onClick={
+                item.value === 'more'
+                  ? (e) => setMoreAnchorEl(e.currentTarget)
+                  : undefined
+              }
+            />
           ))}
         </BottomNavigation>
       </Paper>
 
-      <MoreMenu open={moreOpen} onClose={() => setMoreOpen(false)} />
+      <MoreMenu
+        anchorEl={moreAnchorEl}
+        open={Boolean(moreAnchorEl)}
+        onClose={() => setMoreAnchorEl(null)}
+      />
     </Box>
   );
 }

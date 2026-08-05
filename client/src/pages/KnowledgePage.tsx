@@ -24,6 +24,7 @@ import {
   type KnowledgeEntry,
   type KnowledgeEntryType,
 } from '@career-intelligence/shared';
+import { useLocale } from '../i18n';
 
 const TYPE_ORDER: KnowledgeEntryType[] = [
   'employment',
@@ -34,26 +35,18 @@ const TYPE_ORDER: KnowledgeEntryType[] = [
   'story',
 ];
 
-const TYPE_LABELS: Record<KnowledgeEntryType, string> = {
-  employment: 'Ansættelser',
-  education: 'Uddannelser',
-  skill: 'Kompetencer',
-  project: 'Projekter',
-  achievement: 'Resultater',
-  story: 'Historier',
-};
-
-function formatEmploymentPeriod(entry: KnowledgeEntry): string | null {
+function formatEmploymentPeriod(entry: KnowledgeEntry, present: string): string | null {
   const emp = entry.employment;
   if (!emp) return null;
   const start = emp.startDate || '';
-  const end = emp.isCurrent ? 'nu' : emp.endDate || '';
+  const end = emp.isCurrent ? present : emp.endDate || '';
   if (!start && !end) return null;
   if (start && end) return `${start} – ${end}`;
   return start || end;
 }
 
 function EntryCard({ entry, onOpen }: { entry: KnowledgeEntry; onOpen: () => void }) {
+  const { t } = useLocale();
   const confidence = entry.type === 'skill' ? normalizeSkillConfidence(entry.confidence) : null;
 
   return (
@@ -84,8 +77,8 @@ function EntryCard({ entry, onOpen }: { entry: KnowledgeEntry; onOpen: () => voi
           {entry.type === 'employment' && entry.employment && (
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
               {[entry.employment.role, entry.employment.company].filter(Boolean).join(' · ')}
-              {formatEmploymentPeriod(entry) && ` · ${formatEmploymentPeriod(entry)}`}
-              {entry.employment.isCurrent && ' · Nuværende'}
+              {formatEmploymentPeriod(entry, t('common.present')) && ` · ${formatEmploymentPeriod(entry, t('common.present'))}`}
+              {entry.employment.isCurrent && ` · ${t('knowledge.employment.current')}`}
             </Typography>
           )}
           {entry.description && (
@@ -95,7 +88,7 @@ function EntryCard({ entry, onOpen }: { entry: KnowledgeEntry; onOpen: () => voi
           )}
           {entry.relatedEntryIds.length > 0 && (
             <Typography variant="caption" color="primary" sx={{ mt: 1, display: 'block' }}>
-              {entry.relatedEntryIds.length} relaterede entries
+              {t('knowledge.entry.relatedCount', { count: entry.relatedEntryIds.length })}
             </Typography>
           )}
         </CardContent>
@@ -111,6 +104,7 @@ function AboutMeSection({
   value: string;
   onSaved: (next: string) => void;
 }) {
+  const { t } = useLocale();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
@@ -132,7 +126,7 @@ function AboutMeSection({
 
   const save = async () => {
     if (overLimit) {
-      setError(`Maks. ${ABOUT_ME_MAX_WORDS} ord`);
+      setError(t('knowledge.aboutMe.maxWords', { max: ABOUT_ME_MAX_WORDS }));
       return;
     }
     setSaving(true);
@@ -143,7 +137,7 @@ function AboutMeSection({
       setEditing(false);
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Kunne ikke gemme');
+      setError(err instanceof Error ? err.message : t('knowledge.aboutMe.errorSave'));
     } finally {
       setSaving(false);
     }
@@ -153,11 +147,11 @@ function AboutMeSection({
     <Box sx={{ mb: 3.5 }}>
       <Box sx={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 1, mb: 1.25 }}>
         <Typography variant="h6" fontWeight={700}>
-          Om mig
+          {t('knowledge.aboutMe.title')}
         </Typography>
         {!editing && (
           <Button size="small" startIcon={<EditIcon />} onClick={() => setEditing(true)}>
-            Rediger
+            {t('knowledge.aboutMe.edit')}
           </Button>
         )}
       </Box>
@@ -167,18 +161,18 @@ function AboutMeSection({
           {editing ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
               <TextField
-                label="Om mig"
+                label={t('knowledge.aboutMe.label')}
                 fullWidth
                 multiline
                 minRows={8}
                 maxRows={20}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                placeholder="Fortæl kort hvem du er, hvad der motiverer dig, dine styrker og hvad du søger — fri tekst til AI'en."
+                placeholder={t('knowledge.aboutMe.placeholder')}
                 error={overLimit}
                 helperText={
                   error ||
-                  `${wordCount} / ${ABOUT_ME_MAX_WORDS} ord`
+                  t('knowledge.aboutMe.wordCount', { count: wordCount, max: ABOUT_ME_MAX_WORDS })
                 }
               />
               <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
@@ -190,7 +184,7 @@ function AboutMeSection({
                   }}
                   disabled={saving}
                 >
-                  Annuller
+                  {t('knowledge.aboutMe.cancel')}
                 </Button>
                 <Button
                   variant="contained"
@@ -205,7 +199,7 @@ function AboutMeSection({
                     ) : undefined
                   }
                 >
-                  {saving ? 'Gemmer…' : 'Gem'}
+                  {saving ? t('knowledge.aboutMe.saving') : t('knowledge.aboutMe.save')}
                 </Button>
               </Box>
             </Box>
@@ -215,7 +209,7 @@ function AboutMeSection({
             </Typography>
           ) : (
             <Typography variant="body2" color="text.secondary">
-              Ingen tekst endnu. Tilføj en kort fortælling om dig selv — op til {ABOUT_ME_MAX_WORDS} ord.
+              {t('knowledge.aboutMe.empty', { max: ABOUT_ME_MAX_WORDS })}
             </Typography>
           )}
         </CardContent>
@@ -226,6 +220,7 @@ function AboutMeSection({
 
 export default function KnowledgePage() {
   const navigate = useNavigate();
+  const { t } = useLocale();
   const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
   const [aboutMe, setAboutMe] = useState('');
   const [loading, setLoading] = useState(true);
@@ -243,17 +238,17 @@ export default function KnowledgePage() {
     () =>
       TYPE_ORDER.map((type) => ({
         type,
-        label: TYPE_LABELS[type],
+        label: t(`knowledge.types.${type}`),
         entries: entries.filter((e) => e.type === type),
       })),
-    [entries]
+    [entries, t]
   );
 
   return (
     <Box sx={{ pb: 10 }}>
-      <Typography variant="h5" fontWeight={700} gutterBottom>Knowledge Base</Typography>
+      <Typography variant="h5" fontWeight={700} gutterBottom>{t('knowledge.title')}</Typography>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        AI&apos;s sandhedskilde — om dig, historier, kompetencer og cases. Confidence (1–5) gælder kun kompetencer.
+        {t('knowledge.subtitle')}
       </Typography>
 
       {loading ? (
@@ -285,14 +280,14 @@ export default function KnowledgePage() {
                   size="small"
                   startIcon={<AddIcon />}
                   onClick={() => navigate(`/knowledge/new?type=${group.type}`)}
-                  aria-label={`Tilføj ${group.label.toLowerCase()}`}
+                  aria-label={t('knowledge.group.addAria', { type: group.label.toLowerCase() })}
                 >
-                  Tilføj
+                  {t('knowledge.group.add')}
                 </Button>
               </Box>
               {group.entries.length === 0 ? (
                 <Typography variant="body2" color="text.secondary">
-                  Ingen endnu.
+                  {t('knowledge.group.empty')}
                 </Typography>
               ) : (
                 group.entries.map((entry) => (
@@ -311,12 +306,12 @@ export default function KnowledgePage() {
       <Fab
         variant="extended"
         color="primary"
-        aria-label="Tilføj til knowledge base"
+        aria-label={t('knowledge.fab.addAria')}
         sx={{ position: 'fixed', bottom: 80, right: 16, zIndex: 1100 }}
         onClick={() => navigate('/knowledge/new')}
       >
         <AddIcon sx={{ mr: 1 }} />
-        Tilføj til knowledge base
+        {t('knowledge.fab.add')}
       </Fab>
     </Box>
   );

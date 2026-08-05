@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { api } from '../services/api';
+import { useLocale } from '../i18n';
 
 type CompanyForm = {
   name: string;
@@ -47,6 +48,7 @@ function mergeResearch(form: CompanyForm, research: Partial<CompanyForm>): Compa
 
 export default function NewCompanyPage() {
   const navigate = useNavigate();
+  const { t } = useLocale();
   const [form, setForm] = useState<CompanyForm>(emptyForm);
   const [loading, setLoading] = useState(false);
   const [researching, setResearching] = useState(false);
@@ -58,7 +60,7 @@ export default function NewCompanyPage() {
     const searchName = form.name.trim();
     const searchCvr = form.cvr.trim();
     if (!searchName && !searchCvr) {
-      setResearchError('Angiv virksomhedsnavn eller CVR-nummer');
+      setResearchError(t('newCompany.researchErrorRequired'));
       return;
     }
 
@@ -73,7 +75,7 @@ export default function NewCompanyPage() {
       setForm(mergeResearch(form, result));
       if (result.sources?.length) setResearchSources(result.sources);
     } catch (err) {
-      setResearchError(err instanceof Error ? err.message : 'Kunne ikke hente virksomhedsdata');
+      setResearchError(err instanceof Error ? err.message : t('newCompany.researchErrorGeneric'));
     } finally {
       setResearching(false);
     }
@@ -81,7 +83,7 @@ export default function NewCompanyPage() {
 
   const handleSubmit = async () => {
     if (!form.name.trim()) {
-      setError('Virksomhedsnavn er påkrævet');
+      setError(t('newCompany.errorNameRequired'));
       return;
     }
 
@@ -100,7 +102,7 @@ export default function NewCompanyPage() {
       });
       navigate(`/companies/${company._id}`);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Fejl ved oprettelse');
+      setError(e instanceof Error ? e.message : t('newCompany.errorCreate'));
     } finally {
       setLoading(false);
     }
@@ -108,9 +110,9 @@ export default function NewCompanyPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pb: 4 }}>
-      <Typography variant="h5" fontWeight={700}>Ny virksomhed</Typography>
+      <Typography variant="h5" fontWeight={700}>{t('newCompany.title')}</Typography>
       <Typography variant="body2" color="text.secondary">
-        Opret en virksomhed uden stillingsopslag — fx til uopfordrede ansøgninger eller research.
+        {t('newCompany.subtitle')}
       </Typography>
 
       <Card>
@@ -122,30 +124,30 @@ export default function NewCompanyPage() {
               onClick={autoFill}
               disabled={researching || (!form.name.trim() && !form.cvr.trim())}
             >
-              Find og autoudfyld
+              {t('newCompany.autoFill')}
             </Button>
           </Box>
           {researchError && <Alert severity="error">{researchError}</Alert>}
           {researchSources && (
-            <Alert severity="info">Data hentet fra: {researchSources.join(', ')}</Alert>
+            <Alert severity="info">{t('newCompany.researchSources', { sources: researchSources.join(', ') })}</Alert>
           )}
           <TextField
-            label="Navn"
+            label={t('newCompany.fields.name')}
             fullWidth
             required
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
           />
           <TextField
-            label="CVR-nummer"
+            label={t('newCompany.fields.cvr')}
             fullWidth
-            placeholder="8 cifre"
+            placeholder={t('newCompany.fields.cvrPlaceholder')}
             value={form.cvr}
             onChange={(e) => setForm({ ...form, cvr: e.target.value })}
-            helperText="Søg med navn eller CVR-nummer"
+            helperText={t('newCompany.fields.cvrHelp')}
           />
           <TextField
-            label="Beskrivelse"
+            label={t('newCompany.fields.description')}
             fullWidth
             multiline
             rows={3}
@@ -153,31 +155,31 @@ export default function NewCompanyPage() {
             onChange={(e) => setForm({ ...form, description: e.target.value })}
           />
           <TextField
-            label="Branche"
+            label={t('newCompany.fields.industry')}
             fullWidth
             value={form.industry}
             onChange={(e) => setForm({ ...form, industry: e.target.value })}
           />
           <TextField
-            label="Hjemmeside"
+            label={t('newCompany.fields.website')}
             fullWidth
             value={form.website}
             onChange={(e) => setForm({ ...form, website: e.target.value })}
           />
           <TextField
-            label="LinkedIn"
+            label={t('newCompany.fields.linkedIn')}
             fullWidth
             value={form.linkedIn}
             onChange={(e) => setForm({ ...form, linkedIn: e.target.value })}
           />
           <TextField
-            label="Antal ansatte"
+            label={t('newCompany.fields.employeeCount')}
             fullWidth
             value={form.employeeCount}
             onChange={(e) => setForm({ ...form, employeeCount: e.target.value })}
           />
           <TextField
-            label="Lokation"
+            label={t('newCompany.fields.location')}
             fullWidth
             value={form.location}
             onChange={(e) => setForm({ ...form, location: e.target.value })}
@@ -195,10 +197,10 @@ export default function NewCompanyPage() {
         onClick={handleSubmit}
         startIcon={loading ? <CircularProgress size={20} color="inherit" /> : undefined}
       >
-        {loading ? 'Opretter...' : 'Opret virksomhed'}
+        {loading ? t('newCompany.creating') : t('newCompany.create')}
       </Button>
       <Button fullWidth onClick={() => navigate('/companies')}>
-        Annuller
+        {t('newCompany.cancel')}
       </Button>
     </Box>
   );

@@ -1,6 +1,7 @@
 import { IconButton } from '@mui/material';
 import FavoriteIcon from '@mui/icons-material/Favorite';
 import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import { useLocale } from '../../i18n';
 
 interface Props {
   isWishlisted: boolean;
@@ -9,12 +10,13 @@ interface Props {
 }
 
 export default function WishlistButton({ isWishlisted, onToggle, size = 'small' }: Props) {
+  const { t } = useLocale();
   const interactive = !!onToggle;
 
   return (
     <IconButton
       size={size}
-      aria-label={isWishlisted ? 'Fjern fra ønskeliste' : 'Tilføj til ønskeliste'}
+      aria-label={isWishlisted ? t('wishlist.remove') : t('wishlist.add')}
       aria-pressed={isWishlisted}
       onClick={(e) => {
         e.stopPropagation();

@@ -1,9 +1,14 @@
+import type { Types } from 'mongoose';
 import { CvTemplate } from '../../models';
 import type { AiAnalysis } from '@career-intelligence/shared';
 
 export class CvSelector {
-  async select(jobRequirements: string[], analysis?: AiAnalysis): Promise<{ templateId?: string; reason: string }> {
-    const templates = await CvTemplate.find();
+  async select(
+    tenantId: Types.ObjectId | string,
+    jobRequirements: string[],
+    analysis?: AiAnalysis
+  ): Promise<{ templateId?: string; reason: string }> {
+    const templates = await CvTemplate.find({ tenantId });
     if (templates.length === 0) {
       return { reason: 'Ingen CV-templates uploadet endnu' };
     }

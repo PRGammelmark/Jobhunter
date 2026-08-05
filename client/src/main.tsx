@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import App from './App';
+import { AuthProvider } from './auth/AuthContext';
+import { LocaleProvider } from './i18n';
 import { theme } from './theme';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -10,7 +12,11 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <BrowserRouter>
-        <App />
+        <AuthProvider>
+          <LocaleProvider>
+            <App />
+          </LocaleProvider>
+        </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>
   </React.StrictMode>

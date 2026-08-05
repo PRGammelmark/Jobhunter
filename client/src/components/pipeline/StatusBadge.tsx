@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Chip, Menu, MenuItem } from '@mui/material';
 import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
-import { APPLICATION_STATUSES, STATUS_LABELS, type ApplicationStatus } from '@career-intelligence/shared';
+import { APPLICATION_STATUSES, type ApplicationStatus } from '@career-intelligence/shared';
+import { useLocale } from '../../i18n';
 
 const STATUS_COLORS: Record<ApplicationStatus, 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info'> = {
   not_started: 'default',
@@ -21,13 +22,14 @@ interface Props {
 }
 
 export default function StatusBadge({ status, onChange }: Props) {
+  const { t } = useLocale();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const selectable = !!onChange;
 
   return (
     <>
       <Chip
-        label={STATUS_LABELS[status]}
+        label={t(`status.${status}`)}
         color={STATUS_COLORS[status]}
         size="small"
         onClick={selectable ? (e) => setAnchorEl(e.currentTarget) : undefined}
@@ -52,7 +54,7 @@ export default function StatusBadge({ status, onChange }: Props) {
                 if (s !== status) onChange(s);
               }}
             >
-              {STATUS_LABELS[s]}
+              {t(`status.${s}`)}
             </MenuItem>
           ))}
         </Menu>

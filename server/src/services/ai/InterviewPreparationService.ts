@@ -1,7 +1,20 @@
+import type { Types } from 'mongoose';
 import OpenAI from 'openai';
 import { config } from '../../config';
 import { Application, Company } from '../../models';
-import type { InterviewContext, InterviewPrep } from '@career-intelligence/shared';
+import { composeAiPrompt, type InterviewContext, type InterviewPrep } from '@career-intelligence/shared';
+
+const INTERVIEW_PREP_INSTRUCTIONS = `Forbered kandidat til jobsamtale.
+
+Returnér JSON:
+{
+  "companyResearch": "string",
+  "questionsToAsk": ["string"],
+  "likelyQuestions": ["string"],
+  "salaryPrep": { "range": "string", "talkingPoints": ["string"] },
+  "elevatorPitch": "string",
+  "previousInterviewInsights": ["string"]
+}`;
 
 const openai = config.openaiApiKey ? new OpenAI({ apiKey: config.openaiApiKey }) : null;
 
@@ -14,14 +27,18 @@ const ROUND_LABELS: Record<string, string> = {
 };
 
 export class InterviewPreparationService {
-  async generate(applicationId: string, context: InterviewContext): Promise<InterviewPrep> {
-    const application = await Application.findById(applicationId);
+  async generate(
+    applicationId: string,
+    context: InterviewContext,
+    tenantId: Types.ObjectId | string
+  ): Promise<InterviewPrep> {
+    const application = await Application.findOne({ _id: applicationId, tenantId });
     if (!application) throw new Error('Ansøgning ikke fundet');
 
     let companyMemory = '';
     let companyInfo = '';
     if (application.companyId) {
-      const company = await Company.findById(application.companyId);
+      const company = await Company.findOne({ _id: application.companyId, tenantId });
       if (company) {
         const infoParts = [
           company.description && `Beskrivelse: ${company.description}`,
@@ -48,26 +65,20 @@ Noter: ${company.memory.generalNotes.join('; ')}`;
     let prep: InterviewPrep;
 
     if (openai) {
-      const prompt = `Forbered kandidat til jobsamtale.
+      const promptContext = [
+        'KONTEKST:',
+        `STILLING: ${application.job.title}`,
+        `VIRKSOMHED: ${application.job.companyName}`,
+        `SAMTALE: ${roundLabel}, type: ${typeLabel}, format: ${formatLabel}`,
+        context.notes ? `NOTER: ${context.notes}` : '',
+        `JOB: ${application.job.summary || application.job.rawText?.slice(0, 3000) || ''}`,
+        companyInfo ? `VIRKSOMHEDSINFO:\n${companyInfo}` : '',
+        companyMemory ? `COMPANY MEMORY:${companyMemory}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n');
 
-STILLING: ${application.job.title}
-VIRKSOMHED: ${application.job.companyName}
-SAMTALE: ${roundLabel}, type: ${typeLabel}, format: ${formatLabel}
-${context.notes ? `NOTER: ${context.notes}` : ''}
-
-JOB: ${application.job.summary || application.job.rawText?.slice(0, 3000)}
-${companyInfo ? `\nVIRKSOMHEDSINFO:\n${companyInfo}` : ''}
-${companyMemory ? `COMPANY MEMORY:${companyMemory}` : ''}
-
-Returnér JSON:
-{
-  "companyResearch": "string",
-  "questionsToAsk": ["string"],
-  "likelyQuestions": ["string"],
-  "salaryPrep": { "range": "string", "talkingPoints": ["string"] },
-  "elevatorPitch": "string",
-  "previousInterviewInsights": ["string"]
-}`;
+      const prompt = composeAiPrompt(INTERVIEW_PREP_INSTRUCTIONS, promptContext);
 
       const completion = await openai.chat.completions.create({
         model: config.aiModel,
@@ -109,13 +120,16 @@ Returnér JSON:
     await application.save();
 
     if (application.companyId) {
-      await Company.findByIdAndUpdate(application.companyId, {
-        $addToSet: { interviewIds: application._id },
-        $push: {
-          'memory.interviewQuestions': { $each: prep.likelyQuestions.slice(0, 3) },
-        },
-        lastActivityAt: new Date(),
-      });
+      await Company.findOneAndUpdate(
+        { _id: application.companyId, tenantId },
+        {
+          $addToSet: { interviewIds: application._id },
+          $push: {
+            'memory.interviewQuestions': { $each: prep.likelyQuestions.slice(0, 3) },
+          },
+          lastActivityAt: new Date(),
+        }
+      );
     }
 
     return prep;

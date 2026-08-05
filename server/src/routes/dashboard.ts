@@ -1,38 +1,33 @@
 import { Router } from 'express';
+import { requireAuth } from '../middleware/auth';
 import { getDashboardData } from '../services/dashboardService';
 import { statisticsService } from '../services/ai/StatisticsService';
 import { storageService } from '../services/storage/storageService';
 
 const router = Router();
 
-router.get('/dashboard', async (_req, res) => {
-  const data = await getDashboardData();
+router.use(requireAuth);
+
+router.get('/dashboard', async (req, res) => {
+  const data = await getDashboardData(req.user!.tenantId);
   res.json(data);
 });
 
-router.get('/statistics', async (_req, res) => {
-  const stats = await statisticsService.getStatistics();
+router.get('/statistics', async (req, res) => {
+  const stats = await statisticsService.getStatistics(req.user!.tenantId);
   res.json(stats);
 });
 
-const MIME_BY_EXT: Record<string, string> = {
-  pdf: 'application/pdf',
-  html: 'text/html',
-  txt: 'text/plain',
-  doc: 'application/msword',
-  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-};
-
-router.get('/files/*', async (req, res) => {
+router.get('/files/:fileId', async (req, res) => {
   try {
-    const key = decodeURIComponent(req.path.replace(/^\/files\//, ''));
-    const buffer = await storageService.download(key);
-    const fileName = key.split('/').pop() || 'file';
+    const { buffer, mimeType, fileName } = await storageService.downloadForTenant(
+      req.params.fileId,
+      req.user!.tenantId
+    );
     const ext = fileName.split('.').pop()?.toLowerCase() ?? '';
-    const mime = MIME_BY_EXT[ext] ?? 'application/octet-stream';
     const inline = ext === 'pdf' || ext === 'html' || ext === 'txt';
 
-    res.setHeader('Content-Type', mime);
+    res.setHeader('Content-Type', mimeType);
     res.setHeader(
       'Content-Disposition',
       `${inline ? 'inline' : 'attachment'}; filename="${encodeURIComponent(fileName)}"`

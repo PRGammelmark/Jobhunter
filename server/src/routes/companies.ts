@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Company, Application, DocumentSet } from '../models';
+import { requireAuth } from '../middleware/auth';
 import { normalizeCompanyName, syncCompanyToApplications } from '../services/companyService';
 
 const ALLOWED_UPDATE_FIELDS = [
@@ -15,8 +16,10 @@ const ALLOWED_UPDATE_FIELDS = [
 
 const router = Router();
 
-router.get('/', async (_req, res) => {
-  const companies = await Company.find().sort({ lastActivityAt: -1 });
+router.use(requireAuth);
+
+router.get('/', async (req, res) => {
+  const companies = await Company.find({ tenantId: req.user!.tenantId }).sort({ lastActivityAt: -1 });
   res.json(companies);
 });
 
@@ -26,7 +29,7 @@ router.post('/research', async (req, res) => {
 
   try {
     const { companyResearchService } = await import('../services/ai/CompanyResearchService');
-    const result = await companyResearchService.research(name, cvr);
+    const result = await companyResearchService.research(name, cvr, req.user!.tenantId);
     res.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Research fejlede';
@@ -35,15 +38,17 @@ router.post('/research', async (req, res) => {
 });
 
 router.get('/:id', async (req, res) => {
-  const company = await Company.findById(req.params.id);
+  const company = await Company.findOne({ _id: req.params.id, tenantId: req.user!.tenantId });
   if (!company) return res.status(404).json({ error: 'Virksomhed ikke fundet' });
   res.json(company);
 });
 
 router.get('/:id/applications', async (req, res) => {
-  const company = await Company.findById(req.params.id);
+  const tenantId = req.user!.tenantId;
+  const company = await Company.findOne({ _id: req.params.id, tenantId });
   if (!company) return res.status(404).json({ error: 'Virksomhed ikke fundet' });
   const applications = await Application.find({
+    tenantId,
     $or: [{ companyId: company._id }, { _id: { $in: company.applicationIds } }],
   }).sort({ updatedAt: -1 });
   res.json(applications);
@@ -57,6 +62,7 @@ router.post('/', async (req, res) => {
 
   const { findOrCreateCompany } = await import('../services/companyService');
   const fields = {
+    tenantId: req.user!.tenantId,
     cvr: req.body.cvr,
     description: req.body.description,
     website: req.body.website,
@@ -75,6 +81,7 @@ router.post('/', async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
+  const tenantId = req.user!.tenantId;
   const updates: Record<string, unknown> = {};
   for (const field of ALLOWED_UPDATE_FIELDS) {
     if (req.body[field] !== undefined) {
@@ -88,8 +95,8 @@ router.put('/:id', async (req, res) => {
     updates.normalizedName = normalizeCompanyName(trimmedName);
   }
 
-  const company = await Company.findByIdAndUpdate(
-    req.params.id,
+  const company = await Company.findOneAndUpdate(
+    { _id: req.params.id, tenantId },
     { $set: updates },
     { new: true }
   );
@@ -97,6 +104,7 @@ router.put('/:id', async (req, res) => {
 
   if (typeof updates.name === 'string') {
     await syncCompanyToApplications(
+      tenantId,
       company._id.toString(),
       company.applicationIds.map((id) => id.toString()),
       { name: updates.name }
@@ -107,7 +115,7 @@ router.put('/:id', async (req, res) => {
 });
 
 router.post('/:id/research', async (req, res) => {
-  const company = await Company.findById(req.params.id);
+  const company = await Company.findOne({ _id: req.params.id, tenantId: req.user!.tenantId });
   if (!company) return res.status(404).json({ error: 'Virksomhed ikke fundet' });
 
   const name = typeof req.body.name === 'string' ? req.body.name : company.name;
@@ -115,7 +123,7 @@ router.post('/:id/research', async (req, res) => {
 
   try {
     const { companyResearchService } = await import('../services/ai/CompanyResearchService');
-    const result = await companyResearchService.research(name, cvr);
+    const result = await companyResearchService.research(name, cvr, req.user!.tenantId);
     res.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Research fejlede';
@@ -124,8 +132,8 @@ router.post('/:id/research', async (req, res) => {
 });
 
 router.post('/:id/notes', async (req, res) => {
-  const company = await Company.findByIdAndUpdate(
-    req.params.id,
+  const company = await Company.findOneAndUpdate(
+    { _id: req.params.id, tenantId: req.user!.tenantId },
     { $push: { 'memory.generalNotes': req.body.text }, $set: { lastActivityAt: new Date() } },
     { new: true }
   );
@@ -139,7 +147,7 @@ router.delete('/:id/notes/:noteIndex', async (req, res) => {
     return res.status(400).json({ error: 'Ugyldigt note-index' });
   }
 
-  const company = await Company.findById(req.params.id);
+  const company = await Company.findOne({ _id: req.params.id, tenantId: req.user!.tenantId });
   if (!company) return res.status(404).json({ error: 'Virksomhed ikke fundet' });
   if (noteIndex >= company.memory.generalNotes.length) {
     return res.status(404).json({ error: 'Note ikke fundet' });
@@ -152,20 +160,22 @@ router.delete('/:id/notes/:noteIndex', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
-  const company = await Company.findById(req.params.id);
+  const tenantId = req.user!.tenantId;
+  const company = await Company.findOne({ _id: req.params.id, tenantId });
   if (!company) return res.status(404).json({ error: 'Virksomhed ikke fundet' });
 
   const linkedApplications = await Application.find({
+    tenantId,
     $or: [{ companyId: company._id }, { _id: { $in: company.applicationIds } }],
   }).select('_id');
 
   const applicationIds = linkedApplications.map((app) => app._id);
   if (applicationIds.length > 0) {
-    await DocumentSet.deleteMany({ applicationId: { $in: applicationIds } });
-    await Application.deleteMany({ _id: { $in: applicationIds } });
+    await DocumentSet.deleteMany({ tenantId, applicationId: { $in: applicationIds } });
+    await Application.deleteMany({ tenantId, _id: { $in: applicationIds } });
   }
 
-  await Company.findByIdAndDelete(req.params.id);
+  await Company.findOneAndDelete({ _id: req.params.id, tenantId });
   res.json({ success: true });
 });
 

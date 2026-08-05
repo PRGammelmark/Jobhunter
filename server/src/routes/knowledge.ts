@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import { normalizeSkillConfidence } from '@career-intelligence/shared';
 import { KnowledgeEntry } from '../models';
+import { requireAuth } from '../middleware/auth';
 
 const router = Router();
 
+router.use(requireAuth);
+
 function sanitizeKnowledgeBody(body: Record<string, unknown>) {
-  const data = { ...body };
+  const { tenantId, platformRole, passwordHash, tokenVersion, status, ...data } = body;
   if (data.type === 'skill') {
     data.confidence = normalizeSkillConfidence(data.confidence);
   } else {
@@ -15,19 +18,25 @@ function sanitizeKnowledgeBody(body: Record<string, unknown>) {
   return data;
 }
 
-router.get('/', async (_req, res) => {
-  const entries = await KnowledgeEntry.find().sort({ title: 1 });
+router.get('/', async (req, res) => {
+  const entries = await KnowledgeEntry.find({ tenantId: req.user!.tenantId }).sort({ title: 1 });
   res.json(entries);
 });
 
 router.get('/:id', async (req, res) => {
-  const entry = await KnowledgeEntry.findById(req.params.id).populate('relatedEntryIds');
+  const entry = await KnowledgeEntry.findOne({
+    _id: req.params.id,
+    tenantId: req.user!.tenantId,
+  }).populate('relatedEntryIds');
   if (!entry) return res.status(404).json({ error: 'Entry ikke fundet' });
   res.json(entry);
 });
 
 router.post('/', async (req, res) => {
-  const entry = await KnowledgeEntry.create(sanitizeKnowledgeBody(req.body));
+  const entry = await KnowledgeEntry.create({
+    ...sanitizeKnowledgeBody(req.body),
+    tenantId: req.user!.tenantId,
+  });
   res.status(201).json(entry);
 });
 
@@ -39,13 +48,20 @@ router.put('/:id', async (req, res) => {
     delete (update.$set as Record<string, unknown>).confidence;
     delete (update.$set as Record<string, unknown>).confidenceLabel;
   }
-  const entry = await KnowledgeEntry.findByIdAndUpdate(req.params.id, update, { new: true });
+  const entry = await KnowledgeEntry.findOneAndUpdate(
+    { _id: req.params.id, tenantId: req.user!.tenantId },
+    update,
+    { new: true }
+  );
   if (!entry) return res.status(404).json({ error: 'Entry ikke fundet' });
   res.json(entry);
 });
 
 router.delete('/:id', async (req, res) => {
-  const entry = await KnowledgeEntry.findByIdAndDelete(req.params.id);
+  const entry = await KnowledgeEntry.findOneAndDelete({
+    _id: req.params.id,
+    tenantId: req.user!.tenantId,
+  });
   if (!entry) return res.status(404).json({ error: 'Entry ikke fundet' });
   res.json({ success: true });
 });

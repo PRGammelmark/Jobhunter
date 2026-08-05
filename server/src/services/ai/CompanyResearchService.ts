@@ -1,8 +1,26 @@
+import type { Types } from 'mongoose';
 import OpenAI from 'openai';
 import { config } from '../../config';
 import { fetchCvrData, isCvrNumber } from '../cvr/cvrService';
 import { scrapeCompanyWebsite, scrapeProffPage } from '../scraper/companyScraper';
-import type { CompanyResearchResult } from '@career-intelligence/shared';
+import { composeAiPrompt, type CompanyResearchResult } from '@career-intelligence/shared';
+
+const COMPANY_RESEARCH_INSTRUCTIONS = `Du er research-assistent for en jobansøgnings-app. Strukturér information om en dansk virksomhed baseret på offentlige data og webscraped tekst.
+
+Returnér JSON med denne struktur (kun felter du kan udfylde med rimelig sikkerhed):
+{
+  "name": "string — officielt virksomhedsnavn",
+  "cvr": "string — 8-cifret CVR hvis kendt",
+  "description": "string — 2-4 sætninger om virksomheden, hvad de laver, deres fokus",
+  "website": "string — fuld URL til hjemmeside",
+  "linkedIn": "string — fuld URL til LinkedIn company side",
+  "industry": "string — branche/industri",
+  "employeeCount": "string — antal ansatte som tekst, fx '50' eller '10-50'",
+  "location": "string — by/adresse i Danmark"
+}
+
+Brug kun information fra konteksten. Hvis et felt ikke kan udfyldes, sæt det til null.
+For description: skriv en klar, informativ beskrivelse — ikke bare gentag CVR-data.`;
 
 const openai = config.openaiApiKey ? new OpenAI({ apiKey: config.openaiApiKey }) : null;
 
@@ -20,7 +38,11 @@ function mapCvrToResult(cvr: Awaited<ReturnType<typeof fetchCvrData>>): CompanyR
 }
 
 export class CompanyResearchService {
-  async research(name?: string, cvr?: string): Promise<CompanyResearchResult> {
+  async research(
+    name?: string,
+    cvr?: string,
+    tenantId?: Types.ObjectId | string
+  ): Promise<CompanyResearchResult> {
     const searchValue = (cvr?.trim() || name?.trim() || '').trim();
     if (!searchValue) {
       throw new Error('Angiv virksomhedsnavn eller CVR-nummer');
@@ -96,24 +118,10 @@ export class CompanyResearchService {
       .filter(Boolean)
       .join('\n\n');
 
-    const prompt = `Du er research-assistent for en jobansøgnings-app. Strukturér information om en dansk virksomhed baseret på offentlige data og webscraped tekst.
-
-${rawContext}
-
-Returnér JSON med denne struktur (kun felter du kan udfylde med rimelig sikkerhed):
-{
-  "name": "string — officielt virksomhedsnavn",
-  "cvr": "string — 8-cifret CVR hvis kendt",
-  "description": "string — 2-4 sætninger om virksomheden, hvad de laver, deres fokus",
-  "website": "string — fuld URL til hjemmeside",
-  "linkedIn": "string — fuld URL til LinkedIn company side",
-  "industry": "string — branche/industri",
-  "employeeCount": "string — antal ansatte som tekst, fx '50' eller '10-50'",
-  "location": "string — by/adresse i Danmark"
-}
-
-Brug kun information fra konteksten. Hvis et felt ikke kan udfyldes, sæt det til null.
-For description: skriv en klar, informativ beskrivelse — ikke bare gentag CVR-data.`;
+    const prompt = composeAiPrompt(
+      COMPANY_RESEARCH_INSTRUCTIONS,
+      `KONTEKST:\n${rawContext}`
+    );
 
     const completion = await openai.chat.completions.create({
       model: config.aiModel,

@@ -1,14 +1,37 @@
+import type { Types } from 'mongoose';
 import OpenAI from 'openai';
 import { config } from '../../config';
 import { KnowledgeEntry, CvTemplate, Settings } from '../../models';
 import { knowledgeMatcher } from './KnowledgeMatcher';
-import { normalizeSkillConfidence, type AiAnalysis } from '@career-intelligence/shared';
+import {
+  composeAiPrompt,
+  isAiModelId,
+  normalizeSkillConfidence,
+  type AiAnalysis,
+} from '@career-intelligence/shared';
 
 const openai = config.openaiApiKey ? new OpenAI({ apiKey: config.openaiApiKey }) : null;
 
-function buildFallbackAnalysis(jobText: string, companyName: string): AiAnalysis {
+const JOB_ANALYSIS_INSTRUCTIONS = `Du er karrieresparringspartner. Analysér dette jobopslag mod brugerens Knowledge Base.
+
+Returnér JSON med denne struktur:
+{
+  "strengths": ["string"],
+  "risks": ["string — inkl. lav confidence skills"],
+  "interviewRisks": ["string"],
+  "aiQuestions": [{ "question": "string", "context": "string" }],
+  "suggestedTweaks": ["string"],
+  "recommendation": "use_existing" | "minor_tweaks" | "generate_new",
+  "matchAssessment": "string — ca. 100 ord"
+}
+
+matchAssessment: Skriv en kort, kvalitativ vurdering på dansk (ca. 80–120 ord) af, hvor godt stillingen matcher kandidatens ønsker, kompetencer og profil. Vær ærlig og konkret: nævn både match og evt. mangler/misforhold. Brug Om mig og Knowledge Base aktivt. Skriv i prosa — ikke bullet points.
+
+Respektér confidence (1–5, kun på skills): fremhæv IKKE skills med confidence 1–2 uden at spørge brugeren.
+Stil spørgsmål i stedet for at gætte.`;
+
+function buildFallbackAnalysis(companyName: string): AiAnalysis {
   return {
-    matchScores: { overall: 0, seo: 0, technical: 0, cultural: 0, leadership: 0 },
     strengths: [],
     risks: ['Tilføj OPENAI_API_KEY for fuld analyse'],
     interviewRisks: [],
@@ -28,11 +51,21 @@ function buildFallbackAnalysis(jobText: string, companyName: string): AiAnalysis
 }
 
 export class JobAnalysisService {
-  async analyze(applicationId: string, jobText: string, companyName: string): Promise<AiAnalysis> {
-    const entries = await KnowledgeEntry.find();
-    const cvs = await CvTemplate.find();
-    const settings = await Settings.findById('app');
-    const aboutMe = (settings as { aboutMe?: string } | null)?.aboutMe?.trim() || '';
+  async analyze(
+    applicationId: string,
+    jobText: string,
+    companyName: string,
+    tenantId: Types.ObjectId | string
+  ): Promise<AiAnalysis> {
+    const entries = await KnowledgeEntry.find({ tenantId });
+    const cvs = await CvTemplate.find({ tenantId });
+    const settings = await Settings.findOne({ tenantId }).lean() as {
+      aboutMe?: string;
+      preferences?: { aiModel?: string };
+    } | null;
+    const aboutMe = settings?.aboutMe?.trim() || '';
+    const preferredModel = settings?.preferences?.aiModel?.trim();
+    const aiModel = preferredModel && isAiModelId(preferredModel) ? preferredModel : config.aiModel;
     const matches = knowledgeMatcher.match(jobText, entries);
 
     const suggestedStories = matches.slice(0, 5).map((m) => ({
@@ -42,7 +75,7 @@ export class JobAnalysisService {
     }));
 
     if (!openai) {
-      const fallback = buildFallbackAnalysis(jobText, companyName);
+      const fallback = buildFallbackAnalysis(companyName);
       fallback.suggestedStories = suggestedStories;
       fallback.strengths = matches
         .filter((m) => m.entry.type === 'skill' && normalizeSkillConfidence(m.entry.confidence) >= 4)
@@ -84,41 +117,23 @@ export class JobAnalysisService {
 
     const cvContext = cvs.map((c) => `- ${c.name}: ${c.tags.join(', ')}`).join('\n');
 
-    const prompt = `Du er karrieresparringspartner. Analysér dette jobopslag mod brugerens Knowledge Base.
+    const context = [
+      'KONTEKST:',
+      `VIRKSOMHED: ${companyName}`,
+      'JOBTEKST (kun det primære opslag — ignorér eventuelle øvrige listings/navigation hvis de sniger sig ind):',
+      jobText.slice(0, 6000),
+      'OM MIG (fri tekst om kandidaten — brug som kontekst for personlighed, motivation og styrker):',
+      aboutMe || '(ikke udfyldt)',
+      'KNOWLEDGE BASE:',
+      kbContext,
+      'CV-TEMPLATES:',
+      cvContext || "Ingen CV'er endnu",
+    ].join('\n\n');
 
-VIRKSOMHED: ${companyName}
-
-JOBTEKST (kun det primære opslag — ignorér eventuelle øvrige listings/navigation hvis de sniger sig ind):
-${jobText.slice(0, 6000)}
-
-OM MIG (fri tekst om kandidaten — brug som kontekst for personlighed, motivation og styrker):
-${aboutMe || '(ikke udfyldt)'}
-
-KNOWLEDGE BASE:
-${kbContext}
-
-CV-TEMPLATES:
-${cvContext || 'Ingen CV\'er endnu'}
-
-Returnér JSON med denne struktur:
-{
-  "matchScores": { "overall": 0-100, "seo": 0-100, "technical": 0-100, "cultural": 0-100, "leadership": 0-100 },
-  "strengths": ["string"],
-  "risks": ["string — inkl. lav confidence skills"],
-  "interviewRisks": ["string"],
-  "aiQuestions": [{ "question": "string", "context": "string" }],
-  "suggestedTweaks": ["string"],
-  "recommendation": "use_existing" | "minor_tweaks" | "generate_new",
-  "matchAssessment": "string — ca. 100 ord"
-}
-
-matchAssessment: Skriv en kort, kvalitativ vurdering på dansk (ca. 80–120 ord) af, hvor godt stillingen matcher kandidatens ønsker, kompetencer og profil. Vær ærlig og konkret: nævn både match og evt. mangler/misforhold. Brug Om mig og Knowledge Base aktivt. Skriv i prosa — ikke bullet points.
-
-Respektér confidence (1–5, kun på skills): fremhæv IKKE skills med confidence 1–2 uden at spørge brugeren.
-Stil spørgsmål i stedet for at gætte.`;
+    const prompt = composeAiPrompt(JOB_ANALYSIS_INSTRUCTIONS, context);
 
     const completion = await openai.chat.completions.create({
-      model: config.aiModel,
+      model: aiModel,
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
     });
@@ -129,7 +144,6 @@ Stil spørgsmål i stedet for at gætte.`;
     const parsed = JSON.parse(content) as Partial<AiAnalysis>;
 
     return {
-      matchScores: parsed.matchScores || { overall: 0, seo: 0, technical: 0, cultural: 0, leadership: 0 },
       strengths: parsed.strengths || [],
       risks: parsed.risks || [],
       interviewRisks: parsed.interviewRisks || [],

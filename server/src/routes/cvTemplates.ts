@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
 import { CvTemplate } from '../models';
+import { requireAuth } from '../middleware/auth';
 import { storageService } from '../services/storage/storageService';
 import { extractTextFromBuffer } from '../services/cv/cvTextExtractor';
 import { cvKnowledgeExtractionService } from '../services/ai/CvKnowledgeExtractionService';
@@ -9,14 +10,21 @@ import type { KnowledgeEntryDraft } from '@career-intelligence/shared';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const router = Router();
 
-router.get('/', async (_req, res) => {
-  const templates = await CvTemplate.find().sort({ name: 1 });
+router.use(requireAuth);
+
+function stripClientAuthFields(body: Record<string, unknown>) {
+  const { tenantId, platformRole, passwordHash, tokenVersion, status, ...rest } = body;
+  return rest;
+}
+
+router.get('/', async (req, res) => {
+  const templates = await CvTemplate.find({ tenantId: req.user!.tenantId }).sort({ name: 1 });
   res.json(templates);
 });
 
-router.post('/extract-knowledge', async (_req, res) => {
+router.post('/extract-knowledge', async (req, res) => {
   try {
-    const result = await cvKnowledgeExtractionService.extractFromAllCvs();
+    const result = await cvKnowledgeExtractionService.extractFromAllCvs(req.user!.tenantId);
     res.json(result);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Udtrækning fejlede';
@@ -31,7 +39,7 @@ router.post('/extract-knowledge/confirm', async (req, res) => {
   }
 
   try {
-    const ids = await cvKnowledgeExtractionService.saveCandidates(entries);
+    const ids = await cvKnowledgeExtractionService.saveCandidates(entries, req.user!.tenantId);
     res.status(201).json({ success: true, ids, count: ids.length });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Kunne ikke gemme entries';
@@ -40,12 +48,13 @@ router.post('/extract-knowledge/confirm', async (req, res) => {
 });
 
 router.get('/:id', async (req, res) => {
-  const template = await CvTemplate.findById(req.params.id);
+  const template = await CvTemplate.findOne({ _id: req.params.id, tenantId: req.user!.tenantId });
   if (!template) return res.status(404).json({ error: 'CV ikke fundet' });
   res.json(template);
 });
 
 router.post('/', upload.single('file'), async (req, res) => {
+  const tenantId = req.user!.tenantId;
   const body = req.body;
   let originalFile;
 
@@ -54,7 +63,7 @@ router.post('/', upload.single('file'), async (req, res) => {
       req.file.buffer,
       req.file.originalname,
       req.file.mimetype,
-      'cv-templates'
+      { tenantId, documentType: 'cv-templates' }
     );
     originalFile = { ...stored, uploadedAt: new Date() };
 
@@ -66,6 +75,7 @@ router.post('/', upload.single('file'), async (req, res) => {
     }
 
     const template = await CvTemplate.create({
+      tenantId,
       name: body.name || req.file.originalname,
       tags: body.tags ? JSON.parse(body.tags) : [],
       originalFile,
@@ -74,7 +84,7 @@ router.post('/', upload.single('file'), async (req, res) => {
     });
 
     if (template.isDefault) {
-      await CvTemplate.updateMany({ _id: { $ne: template._id } }, { isDefault: false });
+      await CvTemplate.updateMany({ tenantId, _id: { $ne: template._id } }, { isDefault: false });
     }
 
     return res.status(201).json(template);
@@ -82,6 +92,7 @@ router.post('/', upload.single('file'), async (req, res) => {
 
   const rawText = body.rawText || body.content || '';
   const template = await CvTemplate.create({
+    tenantId,
     name: body.name || 'Nyt CV',
     tags: typeof body.tags === 'string' ? JSON.parse(body.tags) : body.tags || [],
     parsedContent: rawText ? { rawText, sections: { experience: [], education: [], skills: [] } } : undefined,
@@ -92,22 +103,30 @@ router.post('/', upload.single('file'), async (req, res) => {
 });
 
 router.put('/:id', async (req, res) => {
-  const template = await CvTemplate.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+  const tenantId = req.user!.tenantId;
+  const template = await CvTemplate.findOneAndUpdate(
+    { _id: req.params.id, tenantId },
+    { $set: stripClientAuthFields(req.body) },
+    { new: true }
+  );
   if (!template) return res.status(404).json({ error: 'CV ikke fundet' });
 
   if (req.body.isDefault) {
-    await CvTemplate.updateMany({ _id: { $ne: template._id } }, { isDefault: false });
+    await CvTemplate.updateMany({ tenantId, _id: { $ne: template._id } }, { isDefault: false });
   }
 
   res.json(template);
 });
 
 router.delete('/:id', async (req, res) => {
-  const template = await CvTemplate.findByIdAndDelete(req.params.id);
+  const tenantId = req.user!.tenantId;
+  const template = await CvTemplate.findOneAndDelete({ _id: req.params.id, tenantId });
   if (!template) return res.status(404).json({ error: 'CV ikke fundet' });
 
-  if (template.originalFile?.storageKey) {
-    await storageService.delete(template.originalFile.storageKey);
+  if (template.originalFile?.fileId) {
+    await storageService.deleteForTenant(template.originalFile.fileId.toString(), tenantId);
+  } else if (template.originalFile?.storageKey) {
+    await storageService.deleteByKey(template.originalFile.storageKey);
   }
 
   res.json({ success: true });

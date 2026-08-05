@@ -20,14 +20,7 @@ import {
 import CheckIcon from '@mui/icons-material/Check';
 import { api } from '../services/api';
 import { normalizeSkillConfidence, type EmploymentDetails, type KnowledgeEntry, type KnowledgeEntryType } from '@career-intelligence/shared';
-
-const EMPLOYMENT_TYPE_LABELS: Record<string, string> = {
-  full_time: 'Fuldtid',
-  part_time: 'Deltid',
-  contract: 'Kontrakt',
-  freelance: 'Freelance',
-  internship: 'Praktik',
-};
+import { useLocale } from '../i18n';
 
 const ENTRY_TYPES: KnowledgeEntryType[] = [
   'employment',
@@ -37,12 +30,6 @@ const ENTRY_TYPES: KnowledgeEntryType[] = [
   'achievement',
   'story',
 ];
-
-function buildEmploymentTitle(employment?: EmploymentDetails): string {
-  if (!employment?.role && !employment?.company) return '';
-  if (employment.role && employment.company) return `${employment.role} hos ${employment.company}`;
-  return employment.role || employment.company;
-}
 
 function createEmptyEntry(type: KnowledgeEntryType): Partial<KnowledgeEntry> {
   const base: Partial<KnowledgeEntry> = {
@@ -76,6 +63,7 @@ function parseEntryType(value: string | null): KnowledgeEntryType {
 }
 
 export default function KnowledgeEntryPage() {
+  const { t } = useLocale();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const location = useLocation();
@@ -92,6 +80,16 @@ export default function KnowledgeEntryPage() {
   const [saved, setSaved] = useState(Boolean((location.state as { justSaved?: boolean } | null)?.justSaved));
 
   const requestedType = searchParams.get('type');
+  const buildEmploymentTitle = (employment?: EmploymentDetails): string => {
+    if (!employment?.role && !employment?.company) return '';
+    if (employment.role && employment.company) {
+      return t('knowledgeEntry.employment.autoTitle', {
+        role: employment.role,
+        company: employment.company,
+      });
+    }
+    return employment.role || employment.company;
+  };
 
   useEffect(() => {
     api.getKnowledge().then(setAllEntries);
@@ -169,13 +167,13 @@ export default function KnowledgeEntryPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pb: 4 }}>
-      <Typography variant="h5" fontWeight={700}>{isNew ? 'Ny entry' : entry.title}</Typography>
+      <Typography variant="h5" fontWeight={700}>{isNew ? t('knowledgeEntry.newTitle') : entry.title}</Typography>
 
       <FormControl fullWidth>
-        <InputLabel>Type</InputLabel>
+        <InputLabel>{t('knowledgeEntry.type')}</InputLabel>
         <Select
           value={entry.type || 'skill'}
-          label="Type"
+          label={t('knowledgeEntry.type')}
           onChange={(e) => {
             const type = e.target.value as KnowledgeEntryType;
             if (type === 'employment' && !entry.employment) {
@@ -202,26 +200,23 @@ export default function KnowledgeEntryPage() {
             }
           }}
         >
-          <MenuItem value="employment">Ansættelse</MenuItem>
-          <MenuItem value="project">Projekt</MenuItem>
-          <MenuItem value="skill">Kompetence</MenuItem>
-          <MenuItem value="education">Uddannelse</MenuItem>
-          <MenuItem value="achievement">Resultat</MenuItem>
-          <MenuItem value="story">Historie</MenuItem>
+          {ENTRY_TYPES.map((type) => (
+            <MenuItem key={type} value={type}>{t(`knowledgeEntry.types.${type}`)}</MenuItem>
+          ))}
         </Select>
       </FormControl>
 
       {isEmployment ? (
         <>
           <TextField
-            label="Virksomhed"
+            label={t('knowledgeEntry.employment.company')}
             fullWidth
             required
             value={entry.employment?.company || ''}
             onChange={(e) => updateEmployment({ company: e.target.value })}
           />
           <TextField
-            label="Stilling"
+            label={t('knowledgeEntry.employment.role')}
             fullWidth
             required
             value={entry.employment?.role || ''}
@@ -229,15 +224,15 @@ export default function KnowledgeEntryPage() {
           />
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <TextField
-              label="Startdato"
-              placeholder="f.eks. 2020-03"
+              label={t('knowledgeEntry.employment.startDate')}
+              placeholder={t('knowledgeEntry.employment.startDatePlaceholder')}
               sx={{ flex: 1, minWidth: 140 }}
               value={entry.employment?.startDate || ''}
               onChange={(e) => updateEmployment({ startDate: e.target.value })}
             />
             <TextField
-              label="Slutdato"
-              placeholder="f.eks. 2023-06"
+              label={t('knowledgeEntry.employment.endDate')}
+              placeholder={t('knowledgeEntry.employment.endDatePlaceholder')}
               sx={{ flex: 1, minWidth: 140 }}
               disabled={entry.employment?.isCurrent}
               value={entry.employment?.isCurrent ? '' : entry.employment?.endDate || ''}
@@ -256,40 +251,40 @@ export default function KnowledgeEntryPage() {
                 }
               />
             }
-            label="Nuværende ansættelse"
+            label={t('knowledgeEntry.employment.isCurrent')}
           />
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
             <TextField
-              label="Lokation"
+              label={t('knowledgeEntry.employment.location')}
               sx={{ flex: 1, minWidth: 140 }}
               value={entry.employment?.location || ''}
               onChange={(e) => updateEmployment({ location: e.target.value })}
             />
             <FormControl sx={{ flex: 1, minWidth: 140 }}>
-              <InputLabel>Ansættelsestype</InputLabel>
+              <InputLabel>{t('knowledgeEntry.employment.employmentType')}</InputLabel>
               <Select
                 value={entry.employment?.employmentType || ''}
-                label="Ansættelsestype"
+                label={t('knowledgeEntry.employment.employmentType')}
                 onChange={(e) => updateEmployment({ employmentType: e.target.value as EmploymentDetails['employmentType'] })}
               >
-                <MenuItem value="">Ikke angivet</MenuItem>
-                {Object.entries(EMPLOYMENT_TYPE_LABELS).map(([value, label]) => (
-                  <MenuItem key={value} value={value}>{label}</MenuItem>
+                <MenuItem value="">{t('knowledgeEntry.employment.typeNotSet')}</MenuItem>
+                {(['full_time', 'part_time', 'contract', 'freelance', 'internship'] as const).map((value) => (
+                  <MenuItem key={value} value={value}>{t(`knowledgeEntry.employment.types.${value}`)}</MenuItem>
                 ))}
               </Select>
             </FormControl>
           </Box>
           <TextField
-            label="Titel (vises i listen)"
+            label={t('knowledgeEntry.employment.listTitle')}
             fullWidth
             value={entry.title || ''}
             onChange={(e) => setEntry({ ...entry, title: e.target.value })}
-            helperText="Udfyldes automatisk ud fra stilling og virksomhed"
+            helperText={t('knowledgeEntry.employment.listTitleHelp')}
           />
         </>
       ) : (
         <TextField
-          label="Titel"
+          label={t('knowledgeEntry.title')}
           fullWidth
           value={entry.title || ''}
           onChange={(e) => setEntry({ ...entry, title: e.target.value })}
@@ -297,28 +292,28 @@ export default function KnowledgeEntryPage() {
       )}
 
       <TextField
-        label="Beskrivelse"
+        label={t('knowledgeEntry.description')}
         fullWidth
         multiline
         rows={4}
         value={entry.description || ''}
         onChange={(e) => setEntry({ ...entry, description: e.target.value })}
-        placeholder={isEmployment ? 'Kort opsummering af din rolle og ansvar' : undefined}
+        placeholder={isEmployment ? t('knowledgeEntry.descriptionPlaceholderEmployment') : undefined}
       />
 
       {isEmployment && (
         <Box>
-          <Typography variant="subtitle2" gutterBottom>Ansvarsområder og resultater</Typography>
+          <Typography variant="subtitle2" gutterBottom>{t('knowledgeEntry.responsibilities.title')}</Typography>
           <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
             <TextField
               size="small"
               fullWidth
-              placeholder="f.eks. Ledte et team på 5 udviklere"
+              placeholder={t('knowledgeEntry.responsibilities.placeholder')}
               value={responsibilityInput}
               onChange={(e) => setResponsibilityInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && addResponsibility()}
             />
-            <Button onClick={addResponsibility}>Tilføj</Button>
+            <Button onClick={addResponsibility}>{t('knowledgeEntry.responsibilities.add')}</Button>
           </Box>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
             {entry.employment?.responsibilities?.map((r, i) => (
@@ -339,7 +334,7 @@ export default function KnowledgeEntryPage() {
 
       {entry.type === 'skill' && (
         <Box>
-          <Typography gutterBottom>Confidence: {normalizeSkillConfidence(entry.confidence)}/5</Typography>
+          <Typography gutterBottom>{t('knowledgeEntry.skill.confidence', { value: normalizeSkillConfidence(entry.confidence) })}</Typography>
           <Slider
             value={normalizeSkillConfidence(entry.confidence)}
             onChange={(_, v) => setEntry({ ...entry, confidence: v as number })}
@@ -350,10 +345,10 @@ export default function KnowledgeEntryPage() {
             valueLabelDisplay="auto"
           />
           <TextField
-            label="Confidence label (valgfrit)"
+            label={t('knowledgeEntry.skill.confidenceLabel')}
             fullWidth
             size="small"
-            placeholder="I gang med at lære"
+            placeholder={t('knowledgeEntry.skill.confidenceLabelPlaceholder')}
             value={entry.confidenceLabel || ''}
             onChange={(e) => setEntry({ ...entry, confidenceLabel: e.target.value })}
           />
@@ -361,10 +356,10 @@ export default function KnowledgeEntryPage() {
       )}
 
       <Box>
-        <Typography variant="subtitle2" gutterBottom>Keywords</Typography>
+        <Typography variant="subtitle2" gutterBottom>{t('knowledgeEntry.keywords')}</Typography>
         <Box sx={{ display: 'flex', gap: 1, mb: 1 }}>
           <TextField size="small" fullWidth value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && addKeyword()} />
-          <Button onClick={addKeyword}>Tilføj</Button>
+          <Button onClick={addKeyword}>{t('knowledgeEntry.keywordsAdd')}</Button>
         </Box>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
           {entry.keywords?.map((k) => <Chip key={k} label={k} size="small" onDelete={() => setEntry({ ...entry, keywords: entry.keywords?.filter((x) => x !== k) })} />)}
@@ -372,11 +367,11 @@ export default function KnowledgeEntryPage() {
       </Box>
 
       <FormControl fullWidth>
-        <InputLabel>Relaterede entries</InputLabel>
+        <InputLabel>{t('knowledgeEntry.relatedEntries')}</InputLabel>
         <Select
           multiple
           value={entry.relatedEntryIds || []}
-          label="Relaterede entries"
+          label={t('knowledgeEntry.relatedEntries')}
           onChange={(e) => setEntry({ ...entry, relatedEntryIds: e.target.value as string[] })}
           renderValue={(selected) => (
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -396,13 +391,13 @@ export default function KnowledgeEntryPage() {
       {relatedEntries.length > 0 && (
         <Card variant="outlined">
           <CardContent>
-            <Typography variant="subtitle2" gutterBottom>Graf</Typography>
+            <Typography variant="subtitle2" gutterBottom>{t('knowledgeEntry.graph')}</Typography>
             <Typography variant="body2">{entry.title} → {relatedEntries.map((e) => e.title).join(' → ')}</Typography>
           </CardContent>
         </Card>
       )}
 
-      <TextField label="Hvornår bruges den?" fullWidth multiline rows={2} value={entry.whenToUse || ''} onChange={(e) => setEntry({ ...entry, whenToUse: e.target.value })} />
+      <TextField label={t('knowledgeEntry.whenToUse')} fullWidth multiline rows={2} value={entry.whenToUse || ''} onChange={(e) => setEntry({ ...entry, whenToUse: e.target.value })} />
 
       <Button
         variant="contained"
@@ -418,7 +413,7 @@ export default function KnowledgeEntryPage() {
           ) : undefined
         }
       >
-        {saving ? 'Gemmer…' : saved ? 'Gemt!' : 'Gem entry'}
+        {saving ? t('knowledgeEntry.saving') : saved ? t('knowledgeEntry.saved') : t('knowledgeEntry.save')}
       </Button>
     </Box>
   );
