@@ -12,6 +12,7 @@
     "dev:client": "npm run dev -w client",
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client",
     "build:render": "npm run build -w shared && npm run build -w client && npm run build -w server",
+    "install:render": "npm install --include=dev",
     "start": "npm run start -w server"
   },
   "devDependencies": {

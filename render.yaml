@@ -4,7 +4,8 @@ services:
     name: jobhunter
     runtime: node
     plan: free
-    buildCommand: npm install && npm run build:render
+    # --include=dev: NODE_ENV=production otherwise skips typescript/vite/@types
+    buildCommand: npm install --include=dev && npm run build:render
     startCommand: npm start
     envVars:
       - key: NODE_ENV
