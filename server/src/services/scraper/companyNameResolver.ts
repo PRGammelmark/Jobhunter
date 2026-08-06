@@ -25,6 +25,11 @@ const JOB_BOARD_NAMES = new Set(
     'graduateland',
     'academicwork',
     'academic work',
+    'it-jobbank',
+    'computerworld it-jobbank',
+    'talentech',
+    'hr-manager',
+    'emply',
   ].map((s) => s.toLowerCase())
 );
 
@@ -39,8 +44,15 @@ const JOB_BOARD_HOST_FRAGMENTS = [
   'thehub.io',
   'careerjet',
   'jooble',
+  'it-jobbank',
+  'hr-manager.net',
+  'emply.com',
+  'talentech',
 ];
 
+/** Leading words that mean the capture was prose, not a company name. */
+const COMPANY_FILLER_PREFIX =
+  /^(nemlig|ikke|kun|our|the|a|an|dedicated|this|that|their|its|vi|we|du|you|en|et|de|den|det|hos)\b/i;
 const WEAK_PLACEHOLDERS = new Set([
   '',
   'ukendt',
@@ -83,17 +95,21 @@ export function isWeakCompanyName(name: string | undefined | null): boolean {
 }
 
 function cleanCompanyCandidate(raw: string): string | undefined {
-  let name = raw.replace(/\s+/g, ' ').trim();
+  let name = raw.replace(/\u00AD/g, '').replace(/\s+/g, ' ').trim();
   name = name.replace(/^[\s:–—|-]+/, '').replace(/[\s:–—|-]+$/, '');
   // Drop trailing location/boilerplate
   name = name.replace(/\s*[|–—-]\s*(danmark|denmark|københavn|copenhagen|aarhus|odense|aalborg).*$/i, '');
   name = name.replace(/\s+(søger|leder efter|is hiring|are hiring).*$/i, '');
-  name = name.replace(/\s+(a\/s|aps|i\/s|ab|as|ltd|llc|gmbh)\.?$/i, (m) => m.trim()); // keep legal form
+  // "Novo NordiskA/S" → "Novo Nordisk A/S" (JSON-LD often omits the space)
+  name = name.replace(/([^\s])(A\/S|ApS|I\/S)\b/g, '$1 $2');
   name = name.trim();
   if (name.length < 2 || name.length > 80) return undefined;
+  if (COMPANY_FILLER_PREFIX.test(name)) return undefined;
   if (isLikelyJobBoardName(name)) return undefined;
-  // Reject sentences
-  if (/\s(og|and|vi|we|du|you|er|are)\s/i.test(name) && name.split(' ').length > 6) return undefined;
+  // Reject prose fragments (keep "og"/"and" — common in Danish company names)
+  if (/\s(vi|we|du|you|er|are|ikke|kun)\s/i.test(name) && name.split(' ').length > 4) {
+    return undefined;
+  }
   return name;
 }
 
@@ -102,22 +118,22 @@ export function inferCompanyFromText(text: string): string | undefined {
   if (!text?.trim()) return undefined;
   const sample = text.slice(0, 5000);
 
+  // Avoid /i on patterns that require an initial capital — in JS, /i makes [A-Z] match a-z.
   const patterns: RegExp[] = [
     /ansættende virksomhed\s*[:–—-]\s*([^\n.|]{2,80})/i,
     /arbejdsgiver\s*[:–—-]\s*([^\n.|]{2,80})/i,
-    /virksomhed\s*[:–—-]\s*([A-ZÆØÅÄÖÜ][^\n.|]{1,70})/i,
-    /company\s*[:–—-]\s*([A-ZÆØÅÄÖÜ][^\n.|]{1,70})/i,
-    /employer\s*[:–—-]\s*([A-ZÆØÅÄÖÜ][^\n.|]{1,70})/i,
-    /\bhos\s+([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,30}){0,4})\s+(?:søger|leder|ønsker|finder|har)/i,
-    /\b([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+(?:&|og|A\/S|ApS|I\/S|AB|AS|Ltd\.?|LLC|GmbH|Group|Gruppen))?)\s+søger\s+(?:en|et|en\s+\w+)/i,
-    /\bvi er\s+([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,30}){0,3})\b/i,
-    /\bwe are\s+([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,30}){0,3})\b/i,
-    /\bom\s+([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,30}){0,3})\s*[:.]/i,
-    /\babout\s+([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,30}){0,3})\s*[:.]/i,
-    /\bjoin\s+(?:the\s+team\s+at\s+)?([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,30}){0,3})\b/i,
-    /\b([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]+(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]+){0,3})\s+is\s+looking\s+for\b/i,
+    /virksomhed\s*[:–—-]\s*([A-ZÆØÅÄÖÜ][^\n.|]{1,70})/,
+    /[Cc]ompany\s*[:–—-]\s*([A-ZÆØÅÄÖÜ][^\n.|]{1,70})/,
+    /[Ee]mployer\s*[:–—-]\s*([A-ZÆØÅÄÖÜ][^\n.|]{1,70})/,
+    /\b[Hh]os\s+([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,30}){0,4})\s+(?:søger|leder|ønsker|finder|har)/,
+    /\b([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+(?:&|og|A\/S|ApS|I\/S|AB|AS|Ltd\.?|LLC|GmbH|Group|Gruppen))?)\s+søger\s+(?:en|et)\b/,
+    /\b[Vv]i er\s+([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,30}){0,3})\b/,
+    /\b[Ww]e are\s+([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,30}){0,3})\b/,
+    /\b[Oo]m\s+([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,30}){0,3})\s*[:.]/,
+    /\b[Aa]bout\s+([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,30}){0,3})\s*[:.]/,
+    /\b[Jj]oin\s+(?:the\s+team\s+at\s+)?([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,40}(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]{1,30}){0,3})\b/,
+    /\b([A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]+(?:\s+[A-ZÆØÅÄÖÜ][\wæøåÆØÅÄÖÜ&.'’-]+){0,3})\s+is\s+looking\s+for\b/,
   ];
-
   for (const pattern of patterns) {
     const match = sample.match(pattern);
     const candidate = match?.[1] ? cleanCompanyCandidate(match[1]) : undefined;
@@ -208,6 +224,8 @@ export function extractCompanyCandidatesFromHtml(html: string): string[] {
     '[itemprop="hiringOrganization"]',
     '[data-testid="company-name"]',
     'a[data-click="company"]',
+    '.jix-toolbar-top__company a',
+    '.job-company',
     '.company-name',
     '.companyName',
     '.company',
@@ -215,7 +233,6 @@ export function extractCompanyCandidatesFromHtml(html: string): string[] {
     '[class*="companyName"]',
     '[class*="employer-name"]',
     '[class*="employerName"]',
-    '[class*="employer"]',
     'meta[property="og:employment_agency"]',
   ];
 
@@ -230,6 +247,15 @@ export function extractCompanyCandidatesFromHtml(html: string): string[] {
     const cleaned = text ? cleanCompanyCandidate(text) : undefined;
     if (cleaned) candidates.push(cleaned);
   }
+
+  // HR-Manager / Talentech often only expose the employer via logo alt text.
+  $(
+    '#AdvertisementContent img[alt], .AdContentContainer img[alt], img.company-logo[alt], img[class*="company"][alt]'
+  ).each((_, el) => {
+    const alt = $(el).attr('alt');
+    const cleaned = alt ? cleanCompanyCandidate(alt) : undefined;
+    if (cleaned) candidates.push(cleaned);
+  });
 
   // Deduplicate preserving order
   const seen = new Set<string>();
