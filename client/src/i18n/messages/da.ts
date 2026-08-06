@@ -24,8 +24,10 @@ export const da = {
     home: 'Overblik',
     pipeline: 'Ansøgninger',
     knowledge: 'Ansøgningsprofil',
-    cvTemplates: 'CV & templates',
+    cvDocuments: 'CV & dokumenter',
+    templates: 'Skabeloner',
     more: 'Mere',
+    back: 'Tilbage',
     newJobPosting: 'Nyt stillingsopslag',
     companies: 'Virksomheder',
     statistics: 'Statistik',
@@ -62,8 +64,6 @@ export const da = {
   home: {
     title: 'Overblik',
     subtitle: 'Din jobsøgning i ét samlet cockpit.',
-    newJobPosting: 'Ny ansøgning',
-    newJobPostingHint: 'Indsæt joblink eller tekst og kom i gang',
     overview: 'Dit overblik',
     overviewStats: {
       active: 'Aktive ansøgninger',
@@ -285,7 +285,7 @@ export const da = {
       appTemplate: 'Ansøgningsskabelon',
       noTemplate: 'Ingen skabelon',
       noTemplatesAlert:
-        'Du har ingen skabeloner endnu. Gå til CV & templates for at uploade eller oprette dem.',
+        'Du har ingen skabeloner endnu. Gå til Skabeloner for at uploade eller oprette dem.',
       cancel: 'Annuller',
       generate: 'Generér',
     },
@@ -296,7 +296,7 @@ export const da = {
       body: 'Besked',
       attachRecommendations: 'Vedhæft anbefalinger',
       noRecommendations:
-        'Ingen anbefalinger uploadet. Gå til CV & templates → Anbefalinger for at tilføje dem.',
+        'Ingen anbefalinger uploadet. Gå til CV & dokumenter → Anbefalinger for at tilføje dem.',
       footerBase: 'CV og ansøgning vedhæftes automatisk som PDF',
       footerRecsSingular: ' · {{count}} anbefaling vedhæftes også',
       footerRecsPlural: ' · {{count}} anbefalinger vedhæftes også',
@@ -452,10 +452,16 @@ export const da = {
       confirmAction: 'Slet',
     },
   },
-  cvTemplates: {
-    title: 'CV & templates',
+  cvDocuments: {
+    title: 'CV & dokumenter',
     subtitle:
-      'Upload CV\'er, ansøgningsskabeloner og anbefalinger. Anbefalinger kan vedhæftes, når du sender en ansøgning.',
+      'Upload CV\'er og anbefalinger. Anbefalinger kan vedhæftes, når du sender en ansøgning.',
+  },
+  templates: {
+    title: 'Skabeloner',
+    subtitle: 'Upload eller opret ansøgningsskabeloner, som AI kan tage udgangspunkt i.',
+  },
+  cvTemplates: {
     tabs: {
       cvs: "CV'er",
       appTemplates: 'Ansøgningsskabeloner',

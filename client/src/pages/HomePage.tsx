@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ArrowRight,
   BriefcaseBusiness,
   CalendarClock,
   CircleAlert,
   Handshake,
   MessagesSquare,
-  Plus,
 } from 'lucide-react';
 import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
@@ -104,22 +102,6 @@ export default function HomePage() {
   return (
     <div className="flex flex-col gap-4 lg:gap-6">
       <PageHeader title={t('home.title')} subtitle={t('home.subtitle')} />
-
-      <CardButton
-        onClick={() => navigate('/new')}
-        className="bg-gradient-to-br from-brand to-brand-hover text-white border-transparent shadow-[0_10px_24px_rgb(255_87_34_/_0.28)] sm:hidden"
-      >
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/15">
-            <Plus size={22} strokeWidth={2.25} />
-          </span>
-          <div className="min-w-0 flex-1">
-            <div className="text-[15px] font-bold">{t('home.newJobPosting')}</div>
-            <div className="text-sm text-white/85">{t('home.newJobPostingHint')}</div>
-          </div>
-          <ArrowRight size={18} className="opacity-90" />
-        </div>
-      </CardButton>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {overviewItems.map((item) => (

@@ -31,130 +31,31 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { api, getFileUrl } from '../services/api';
 import type {
   CvTemplate,
-  ApplicationTemplate,
   Recommendation,
   CvKnowledgeExtractionResult,
   KnowledgeEntryDraft,
 } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
 import { PageHeader } from '../ui';
+import {
+  TemplateList,
+  DocumentViewerDialog,
+  DeleteDocumentDialog,
+  formatFileSize,
+  type ViewableDocument,
+} from './cv/shared';
 
-type TemplateItem = CvTemplate | ApplicationTemplate;
 type DeleteTarget =
-  | { type: 'cv' | 'app'; item: TemplateItem }
+  | { type: 'cv'; item: CvTemplate }
   | { type: 'recommendation'; item: Recommendation };
 
-function formatFileSize(bytes?: number): string {
-  if (!bytes) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function canPreviewInline(item: TemplateItem): boolean {
-  const mime = item.originalFile?.mimeType;
-  return mime === 'application/pdf' || mime === 'text/plain' || !!item.parsedContent?.rawText;
-}
-
-function TemplateList({
-  items,
-  loading,
-  emptyLabel,
-  previewLabel,
-  onDelete,
-  onPreview,
-}: {
-  items: TemplateItem[];
-  loading: boolean;
-  emptyLabel: string;
-  previewLabel: string;
-  onDelete: (item: TemplateItem) => void;
-  onPreview: (item: TemplateItem) => void;
-}) {
-  const { t } = useLocale();
-  if (loading) {
-    return [1, 2].map((i) => <Skeleton key={i} variant="rounded" height={80} sx={{ mb: 1 }} />);
-  }
-  if (items.length === 0) {
-    return <Typography color="text.secondary">{emptyLabel}</Typography>;
-  }
-  return (
-    <>
-      {items.map((item) => (
-        <Card key={item._id} sx={{ mb: 1.5 }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="subtitle1" fontWeight={600}>{item.name}</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {item.isDefault && <Chip label={t('cvTemplates.default')} size="small" color="primary" />}
-                <IconButton
-                  size="small"
-                  color="error"
-                  aria-label={t('cvTemplates.deleteAria', { name: item.name })}
-                  onClick={() => onDelete(item)}
-                >
-                  <DeleteOutlineIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            </Box>
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-              {item.tags.map((t) => <Chip key={t} label={t} size="small" variant="outlined" />)}
-            </Box>
-            {item.originalFile && (
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                {item.originalFile.fileName}
-                {item.originalFile.sizeBytes ? ` · ${formatFileSize(item.originalFile.sizeBytes)}` : ''}
-              </Typography>
-            )}
-            {!item.originalFile && item.parsedContent?.rawText && (
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                {t('cvTemplates.manualEntered')}
-              </Typography>
-            )}
-            <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-              {t('cvTemplates.statsUsed', { times: item.stats.timesUsed, interviews: item.stats.interviewsGenerated })}
-            </Typography>
-            {(item.originalFile || item.parsedContent?.rawText) && (
-              <Box sx={{ display: 'flex', gap: 1, mt: 1.5, flexWrap: 'wrap' }}>
-                {canPreviewInline(item) && (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<VisibilityIcon />}
-                    onClick={() => onPreview(item)}
-                  >
-                    {previewLabel}
-                  </Button>
-                )}
-                {item.originalFile?.fileId && (
-                  <Button
-                    size="small"
-                    variant="outlined"
-                    startIcon={<OpenInNewIcon />}
-                    href={getFileUrl(item.originalFile.fileId)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    {t('cvTemplates.open')}
-                  </Button>
-                )}
-              </Box>
-            )}
-          </CardContent>
-        </Card>
-      ))}
-    </>
-  );
-}
-
-export default function CvTemplatesPage() {
+export default function CvDocumentsPage() {
   const { t } = useLocale();
   const [tab, setTab] = useState(0);
   const [cvTemplates, setCvTemplates] = useState<CvTemplate[]>([]);
-  const [appTemplates, setAppTemplates] = useState<ApplicationTemplate[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [viewer, setViewer] = useState<TemplateItem | Recommendation | null>(null);
+  const [viewer, setViewer] = useState<ViewableDocument | null>(null);
   const [toDelete, setToDelete] = useState<DeleteTarget | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
@@ -168,17 +69,14 @@ export default function CvTemplatesPage() {
   const [extractError, setExtractError] = useState<string | null>(null);
   const [extractSuccess, setExtractSuccess] = useState<string | null>(null);
   const cvFileRef = useRef<HTMLInputElement>(null);
-  const appFileRef = useRef<HTMLInputElement>(null);
   const recFileRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
-    const [cvs, apps, recs] = await Promise.all([
+    const [cvs, recs] = await Promise.all([
       api.getCvTemplates(),
-      api.getApplicationTemplates(),
       api.getRecommendations(),
     ]);
     setCvTemplates(cvs);
-    setAppTemplates(apps);
     setRecommendations(recs);
   };
 
@@ -191,14 +89,6 @@ export default function CvTemplatesPage() {
     form.append('file', file);
     form.append('name', file.name.replace(/\.[^.]+$/, ''));
     await api.createCvTemplate(form);
-    load();
-  };
-
-  const uploadApp = async (file: File) => {
-    const form = new FormData();
-    form.append('file', file);
-    form.append('name', file.name.replace(/\.[^.]+$/, ''));
-    await api.createApplicationTemplate(form);
     load();
   };
 
@@ -219,11 +109,7 @@ export default function CvTemplatesPage() {
     if (!manualForm.name.trim() || !manualForm.content.trim()) return;
     setSaving(true);
     try {
-      if (tab === 0) {
-        await api.createCvTemplateManual({ name: manualForm.name, rawText: manualForm.content });
-      } else {
-        await api.createApplicationTemplateManual({ name: manualForm.name, rawText: manualForm.content });
-      }
+      await api.createCvTemplateManual({ name: manualForm.name, rawText: manualForm.content });
       setManualOpen(false);
       load();
     } finally {
@@ -237,8 +123,6 @@ export default function CvTemplatesPage() {
     try {
       if (toDelete.type === 'cv') {
         await api.deleteCvTemplate(toDelete.item._id);
-      } else if (toDelete.type === 'app') {
-        await api.deleteApplicationTemplate(toDelete.item._id);
       } else {
         await api.deleteRecommendation(toDelete.item._id);
       }
@@ -317,23 +201,23 @@ export default function CvTemplatesPage() {
     }
   };
 
-  const viewerUrl = viewer?.originalFile?.fileId ? getFileUrl(viewer.originalFile.fileId) : '';
-  const viewerIsPdf = viewer?.originalFile?.mimeType === 'application/pdf';
-  const viewerText =
-    viewer && 'parsedContent' in viewer ? viewer.parsedContent?.rawText : undefined;
   const selectedCount = selectedIndexes.size;
   const allSelected =
     !!extractResult &&
     extractResult.candidates.length > 0 &&
     selectedCount === extractResult.candidates.length;
 
+  const deleteTitle =
+    toDelete?.type === 'recommendation'
+      ? t('cvTemplates.deleteDialog.titleRecommendation')
+      : t('cvTemplates.deleteDialog.titleCv');
+
   return (
     <Box>
-      <PageHeader title={t('cvTemplates.title')} subtitle={t('cvTemplates.subtitle')} />
+      <PageHeader title={t('cvDocuments.title')} subtitle={t('cvDocuments.subtitle')} />
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }} variant="scrollable" scrollButtons="auto">
         <Tab label={t('cvTemplates.tabs.cvs')} />
-        <Tab label={t('cvTemplates.tabs.appTemplates')} />
         <Tab label={t('cvTemplates.tabs.recommendations')} />
       </Tabs>
 
@@ -343,13 +227,6 @@ export default function CvTemplatesPage() {
         accept=".pdf,.docx,.doc,.txt"
         hidden
         onChange={(e) => e.target.files?.[0] && uploadCv(e.target.files[0])}
-      />
-      <input
-        ref={appFileRef}
-        type="file"
-        accept=".pdf,.docx,.doc,.txt"
-        hidden
-        onChange={(e) => e.target.files?.[0] && uploadApp(e.target.files[0])}
       />
       <input
         ref={recFileRef}
@@ -366,37 +243,34 @@ export default function CvTemplatesPage() {
           sx={{ flex: '1 1 140px' }}
           onClick={() => {
             if (tab === 0) cvFileRef.current?.click();
-            else if (tab === 1) appFileRef.current?.click();
             else recFileRef.current?.click();
           }}
         >
           {tab === 0
             ? t('cvTemplates.upload.cv')
-            : tab === 1
-              ? t('cvTemplates.upload.application')
-              : t('cvTemplates.upload.recommendation')}
+            : t('cvTemplates.upload.recommendation')}
         </Button>
-        {tab < 2 && (
-          <Button
-            variant="outlined"
-            startIcon={<EditNoteIcon />}
-            sx={{ flex: '1 1 140px' }}
-            onClick={openManual}
-          >
-            {t('cvTemplates.addManual')}
-          </Button>
-        )}
         {tab === 0 && (
-          <Button
-            variant="outlined"
-            color="secondary"
-            startIcon={<AutoAwesomeIcon />}
-            sx={{ flex: '1 1 220px' }}
-            onClick={startExtract}
-            disabled={loading || cvTemplates.length === 0}
-          >
-            {t('cvTemplates.extractToKnowledge')}
-          </Button>
+          <>
+            <Button
+              variant="outlined"
+              startIcon={<EditNoteIcon />}
+              sx={{ flex: '1 1 140px' }}
+              onClick={openManual}
+            >
+              {t('cvTemplates.addManual')}
+            </Button>
+            <Button
+              variant="outlined"
+              color="secondary"
+              startIcon={<AutoAwesomeIcon />}
+              sx={{ flex: '1 1 220px' }}
+              onClick={startExtract}
+              disabled={loading || cvTemplates.length === 0}
+            >
+              {t('cvTemplates.extractToKnowledge')}
+            </Button>
+          </>
         )}
       </Box>
 
@@ -406,16 +280,7 @@ export default function CvTemplatesPage() {
           loading={loading}
           emptyLabel={t('cvTemplates.empty.cvs')}
           previewLabel={t('cvTemplates.preview.cv')}
-          onDelete={(item) => setToDelete({ type: 'cv', item })}
-          onPreview={setViewer}
-        />
-      ) : tab === 1 ? (
-        <TemplateList
-          items={appTemplates}
-          loading={loading}
-          emptyLabel={t('cvTemplates.empty.appTemplates')}
-          previewLabel={t('cvTemplates.preview.template')}
-          onDelete={(item) => setToDelete({ type: 'app', item })}
+          onDelete={(item) => setToDelete({ type: 'cv', item: item as CvTemplate })}
           onPreview={setViewer}
         />
       ) : loading ? (
@@ -479,29 +344,23 @@ export default function CvTemplatesPage() {
       )}
 
       <Dialog open={manualOpen} onClose={() => !saving && setManualOpen(false)} fullWidth maxWidth="md">
-        <DialogTitle>
-          {tab === 0 ? t('cvTemplates.manualDialog.titleCv') : t('cvTemplates.manualDialog.titleApp')}
-        </DialogTitle>
+        <DialogTitle>{t('cvTemplates.manualDialog.titleCv')}</DialogTitle>
         <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2, pt: 1 }}>
           <TextField
             label={t('cvTemplates.manualDialog.name')}
             fullWidth
             value={manualForm.name}
             onChange={(e) => setManualForm({ ...manualForm, name: e.target.value })}
-            placeholder={tab === 0 ? t('cvTemplates.manualDialog.namePlaceholderCv') : t('cvTemplates.manualDialog.namePlaceholderApp')}
+            placeholder={t('cvTemplates.manualDialog.namePlaceholderCv')}
           />
           <TextField
-            label={tab === 0 ? t('cvTemplates.manualDialog.contentCv') : t('cvTemplates.manualDialog.contentApp')}
+            label={t('cvTemplates.manualDialog.contentCv')}
             fullWidth
             multiline
             rows={12}
             value={manualForm.content}
             onChange={(e) => setManualForm({ ...manualForm, content: e.target.value })}
-            placeholder={
-              tab === 0
-                ? t('cvTemplates.manualDialog.contentPlaceholderCv')
-                : t('cvTemplates.manualDialog.contentPlaceholderApp')
-            }
+            placeholder={t('cvTemplates.manualDialog.contentPlaceholderCv')}
           />
         </DialogContent>
         <DialogActions>
@@ -663,85 +522,16 @@ export default function CvTemplatesPage() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={!!toDelete} onClose={() => !deleting && setToDelete(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>
-          {toDelete?.type === 'cv'
-            ? t('cvTemplates.deleteDialog.titleCv')
-            : toDelete?.type === 'recommendation'
-              ? t('cvTemplates.deleteDialog.titleRecommendation')
-              : t('cvTemplates.deleteDialog.titleTemplate')}
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
-            {t('cvTemplates.deleteDialog.confirm', { name: toDelete?.item.name || '' })}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setToDelete(null)} disabled={deleting}>{t('cvTemplates.deleteDialog.cancel')}</Button>
-          <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting}>
-            {t('cvTemplates.deleteDialog.confirmAction')}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <DeleteDocumentDialog
+        open={!!toDelete}
+        title={deleteTitle}
+        name={toDelete?.item.name || ''}
+        deleting={deleting}
+        onCancel={() => setToDelete(null)}
+        onConfirm={confirmDelete}
+      />
 
-      <Dialog
-        open={!!viewer}
-        onClose={() => setViewer(null)}
-        fullWidth
-        maxWidth={viewerIsPdf ? 'lg' : 'md'}
-        fullScreen={viewerIsPdf}
-      >
-        <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pr: 1 }}>
-          {viewer?.name}
-          <IconButton onClick={() => setViewer(null)} aria-label={t('cvTemplates.viewer.closeAria')}>
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ p: viewerIsPdf ? 0 : 2, display: 'flex', flexDirection: 'column' }}>
-          {viewerIsPdf && viewerUrl && (
-            <Box
-              component="iframe"
-              src={viewerUrl}
-              title={viewer?.name}
-              sx={{ flex: 1, width: '100%', minHeight: viewerIsPdf ? 'calc(100vh - 120px)' : 400, border: 'none' }}
-            />
-          )}
-          {!viewerIsPdf && viewerText && (
-            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
-              {viewerText}
-            </Typography>
-          )}
-          {!viewerIsPdf && !viewerText && viewer?.originalFile && (
-            <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Typography color="text.secondary" sx={{ mb: 2 }}>
-                {t('cvTemplates.viewer.cannotPreview')}
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<OpenInNewIcon />}
-                href={viewerUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                {t('cvTemplates.viewer.openFile', { fileName: viewer.originalFile.fileName })}
-              </Button>
-            </Box>
-          )}
-        </DialogContent>
-        {viewer?.originalFile && (
-          <DialogActions>
-            <Button
-              startIcon={<OpenInNewIcon />}
-              href={viewerUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              {t('cvTemplates.viewer.openInNewTab')}
-            </Button>
-            <Button onClick={() => setViewer(null)}>{t('cvTemplates.viewer.close')}</Button>
-          </DialogActions>
-        )}
-      </Dialog>
+      <DocumentViewerDialog viewer={viewer} onClose={() => setViewer(null)} />
     </Box>
   );
 }

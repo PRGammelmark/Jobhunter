@@ -26,8 +26,10 @@ export const en: Messages = {
     home: 'Overview',
     pipeline: 'Applications',
     knowledge: 'Application Profile',
-    cvTemplates: 'CV & templates',
+    cvDocuments: 'CV & documents',
+    templates: 'Templates',
     more: 'More',
+    back: 'Back',
     newJobPosting: 'New job posting',
     companies: 'Companies',
     statistics: 'Statistics',
@@ -64,8 +66,6 @@ export const en: Messages = {
   home: {
     title: 'Overview',
     subtitle: 'Your job search in one cockpit.',
-    newJobPosting: 'New application',
-    newJobPostingHint: 'Paste a job link or text to get started',
     overview: 'Your overview',
     overviewStats: {
       active: 'Active applications',
@@ -287,7 +287,7 @@ export const en: Messages = {
       appTemplate: 'Application template',
       noTemplate: 'No template',
       noTemplatesAlert:
-        'You don’t have any templates yet. Go to CV & templates to upload or create them.',
+        'You don’t have any templates yet. Go to Templates to upload or create them.',
       cancel: 'Cancel',
       generate: 'Generate',
     },
@@ -298,7 +298,7 @@ export const en: Messages = {
       body: 'Message',
       attachRecommendations: 'Attach recommendations',
       noRecommendations:
-        'No recommendations uploaded. Go to CV & templates → Recommendations to add them.',
+        'No recommendations uploaded. Go to CV & documents → Recommendations to add them.',
       footerBase: 'CV and cover letter are attached automatically as PDF',
       footerRecsSingular: ' · {{count}} recommendation will also be attached',
       footerRecsPlural: ' · {{count}} recommendations will also be attached',
@@ -454,10 +454,16 @@ export const en: Messages = {
       confirmAction: 'Delete',
     },
   },
-  cvTemplates: {
-    title: 'CV & templates',
+  cvDocuments: {
+    title: 'CV & documents',
     subtitle:
-      'Upload CVs, application templates, and recommendations. Recommendations can be attached when you send an application.',
+      'Upload CVs and recommendations. Recommendations can be attached when you send an application.',
+  },
+  templates: {
+    title: 'Templates',
+    subtitle: 'Upload or create application templates for the AI to base cover letters on.',
+  },
+  cvTemplates: {
     tabs: {
       cvs: 'CVs',
       appTemplates: 'Application templates',

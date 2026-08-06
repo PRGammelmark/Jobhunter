@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from 'react';
 import {
   BriefcaseBusiness,
   ChartColumn,
+  ChevronLeft,
   FileText,
   Home,
   LayoutGrid,
+  LayoutTemplate,
   Lightbulb,
   MoreHorizontal,
   Plus,
@@ -27,7 +29,8 @@ import NewApplicationPage from '../../pages/NewApplicationPage';
 import ApplicationPage from '../../pages/ApplicationPage';
 import KnowledgePage from '../../pages/KnowledgePage';
 import KnowledgeEntryPage from '../../pages/KnowledgeEntryPage';
-import CvTemplatesPage from '../../pages/CvTemplatesPage';
+import CvDocumentsPage from '../../pages/CvDocumentsPage';
+import TemplatesPage from '../../pages/TemplatesPage';
 import CompanyPage from '../../pages/CompanyPage';
 import CompaniesPage from '../../pages/CompaniesPage';
 import NewCompanyPage from '../../pages/NewCompanyPage';
@@ -107,7 +110,7 @@ function AppLayoutInner() {
   const mobileNav = [
     { label: t('nav.home'), value: '/', icon: Home },
     { label: t('nav.pipeline'), value: '/pipeline', icon: BriefcaseBusiness },
-    { label: t('nav.knowledge'), value: '/knowledge', icon: Lightbulb },
+    { label: t('nav.templates'), value: '/templates', icon: LayoutTemplate },
     { label: t('nav.more'), value: 'more', icon: MoreHorizontal },
   ];
 
@@ -115,7 +118,8 @@ function AppLayoutInner() {
     { label: t('nav.home'), value: '/', icon: Home },
     { label: t('nav.pipeline'), value: '/pipeline', icon: LayoutGrid },
     { label: t('nav.knowledge'), value: '/knowledge', icon: Lightbulb },
-    { label: t('nav.cvTemplates'), value: '/cv', icon: FileText },
+    { label: t('nav.cvDocuments'), value: '/cv', icon: FileText },
+    { label: t('nav.templates'), value: '/templates', icon: LayoutTemplate },
     { label: t('nav.companies'), value: '/companies', icon: Building2 },
     { label: t('nav.statistics'), value: '/statistics', icon: ChartColumn },
     { label: t('nav.settings'), value: '/settings', icon: Settings },
@@ -136,6 +140,8 @@ function AppLayoutInner() {
   const isKnowledgePage = location.pathname.startsWith('/knowledge');
   const isCompaniesPage = location.pathname.startsWith('/companies');
   const hideMobileFab = isKnowledgePage || isCompaniesPage;
+  const mobileRootPaths = new Set(['/', '/pipeline', '/templates']);
+  const showMobileBack = !mobileRootPaths.has(location.pathname);
   const mainRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -145,6 +151,26 @@ function AppLayoutInner() {
   const onLogout = async () => {
     await logout();
     navigate('/login');
+  };
+
+  const onMobileBack = () => {
+    if (location.key !== 'default') {
+      navigate(-1);
+      return;
+    }
+    if (location.pathname.startsWith('/applications') || location.pathname === '/new') {
+      navigate('/pipeline');
+      return;
+    }
+    if (location.pathname.startsWith('/knowledge/')) {
+      navigate('/knowledge');
+      return;
+    }
+    if (location.pathname.startsWith('/companies/') || location.pathname === '/companies/new') {
+      navigate('/companies');
+      return;
+    }
+    navigate('/');
   };
 
   const mobileNavButtonClass = (active: boolean) =>
@@ -207,16 +233,27 @@ function AppLayoutInner() {
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Mobile top bar — fixed to viewport */}
         <header className="fixed inset-x-0 top-0 z-40 border-b border-line/80 bg-surface/90 px-4 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md lg:hidden">
-          <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-3">
-            <Link to="/" className="min-w-0">
-              <BrandMark />
-            </Link>
-            <div className="flex shrink-0 items-center gap-2">
-              <LanguageSwitcher />
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-soft text-xs font-bold text-brand">
-                {userInitials(user?.name)}
-              </div>
+          <div className="relative mx-auto flex h-14 max-w-3xl items-center">
+            <div className="z-10 flex w-12 shrink-0 items-center justify-start">
+              {showMobileBack && (
+                <IconButton
+                  label={t('nav.back')}
+                  onClick={onMobileBack}
+                  className="-ml-2 h-10 w-10"
+                >
+                  <ChevronLeft size={24} strokeWidth={2.25} />
+                </IconButton>
+              )}
             </div>
+            <Link
+              to="/"
+              className="absolute inset-x-0 flex justify-center pointer-events-none"
+            >
+              <span className="pointer-events-auto">
+                <BrandMark />
+              </span>
+            </Link>
+            <div className="ml-auto w-12 shrink-0" aria-hidden />
           </div>
         </header>
         <div
@@ -240,7 +277,8 @@ function AppLayoutInner() {
                 <Route path="applications/:id" element={<ApplicationPage />} />
                 <Route path="knowledge" element={<KnowledgePage />} />
                 <Route path="knowledge/:id" element={<KnowledgeEntryPage />} />
-                <Route path="cv" element={<CvTemplatesPage />} />
+                <Route path="cv" element={<CvDocumentsPage />} />
+                <Route path="templates" element={<TemplatesPage />} />
                 <Route path="companies" element={<CompaniesPage />} />
                 <Route path="companies/new" element={<NewCompanyPage />} />
                 <Route path="companies/:id" element={<CompanyPage />} />
