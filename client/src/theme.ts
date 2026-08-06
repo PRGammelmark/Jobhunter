@@ -86,9 +86,18 @@ export const theme = createTheme({
         },
       },
     },
+    MuiInputBase: {
+      styleOverrides: {
+        root: { fontSize: 16 },
+        input: { fontSize: 16 },
+        inputSizeSmall: { fontSize: 16 },
+      },
+    },
     MuiOutlinedInput: {
       styleOverrides: {
-        root: { borderRadius: 14 },
+        root: { borderRadius: 14, fontSize: 16 },
+        input: { fontSize: 16 },
+        inputSizeSmall: { fontSize: 16 },
       },
     },
     MuiDialog: {

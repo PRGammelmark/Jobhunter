@@ -223,7 +223,7 @@ export default function SettingsPage() {
             onChange={(e) => setCoverLetterPrompt(e.target.value)}
             slotProps={{
               input: {
-                sx: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: 13 },
+                sx: { fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace', fontSize: 16 },
               },
             }}
           />
