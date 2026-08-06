@@ -403,7 +403,7 @@ export default function CompanyPage() {
                     bgcolor: 'background.default',
                   }}
                 >
-                  <Typography variant="body2" sx={{ flex: 1, whiteSpace: 'pre-wrap', pt: 0.5 }}>
+                  <Typography variant="body2" sx={{ flex: 1, whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', pt: 0.5 }}>
                     {n}
                   </Typography>
                   <IconButton

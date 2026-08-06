@@ -73,7 +73,7 @@ export default function PipelinePage() {
     <div>
       <PageHeader title={t('pipeline.title')} subtitle={t('pipeline.subtitle')} />
 
-      <div className="mb-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mb-4 flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <FilterChip
           active={filter === 'all'}
           count={applications.length}

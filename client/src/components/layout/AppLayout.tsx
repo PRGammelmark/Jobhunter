@@ -1,5 +1,5 @@
 import { Link, Navigate, Outlet, Route, Routes, useNavigate, useLocation } from 'react-router-dom';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   BriefcaseBusiness,
   ChartColumn,
@@ -136,14 +136,25 @@ function AppLayoutInner() {
   const isKnowledgePage = location.pathname.startsWith('/knowledge');
   const isCompaniesPage = location.pathname.startsWith('/companies');
   const hideMobileFab = isKnowledgePage || isCompaniesPage;
+  const mainRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0, left: 0 });
+  }, [location.pathname, location.search]);
 
   const onLogout = async () => {
     await logout();
     navigate('/login');
   };
 
+  const mobileNavButtonClass = (active: boolean) =>
+    cn(
+      'flex min-w-0 flex-col items-center justify-center gap-1 px-0.5 pb-2 pt-2 text-[11px] font-semibold',
+      active ? 'text-brand' : 'text-ink-muted'
+    );
+
   return (
-    <div className="min-h-dvh bg-canvas lg:flex">
+    <div className="bg-canvas max-lg:flex max-lg:h-dvh max-lg:flex-col max-lg:overflow-hidden lg:flex lg:min-h-dvh">
       {/* Desktop sidebar */}
       <aside className="sticky top-0 hidden h-dvh w-[248px] shrink-0 flex-col border-r border-line bg-surface px-4 py-5 lg:flex">
         <Link to="/" className="mb-8 px-1">
@@ -193,14 +204,14 @@ function AppLayoutInner() {
         </div>
       </aside>
 
-      <div className="flex min-w-0 flex-1 flex-col pb-[calc(5.5rem+env(safe-area-inset-bottom))] lg:pb-0">
-        {/* Mobile top bar */}
-        <header className="sticky top-0 z-40 border-b border-line/80 bg-surface/90 px-4 py-3 backdrop-blur-md lg:hidden">
-          <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
-            <Link to="/">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {/* Mobile top bar — fixed to viewport */}
+        <header className="fixed inset-x-0 top-0 z-40 border-b border-line/80 bg-surface/90 px-4 pt-[env(safe-area-inset-top,0px)] backdrop-blur-md lg:hidden">
+          <div className="mx-auto flex h-14 max-w-3xl items-center justify-between gap-3">
+            <Link to="/" className="min-w-0">
               <BrandMark />
             </Link>
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <LanguageSwitcher />
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-soft text-xs font-bold text-brand">
                 {userInitials(user?.name)}
@@ -208,10 +219,18 @@ function AppLayoutInner() {
             </div>
           </div>
         </header>
+        <div
+          className="shrink-0 lg:hidden"
+          style={{ height: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}
+          aria-hidden
+        />
 
         <DesktopTopBar />
 
-        <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-4 lg:max-w-6xl lg:px-8 lg:py-6">
+        <main
+          ref={mainRef}
+          className="mx-auto w-full min-w-0 max-w-3xl flex-1 px-4 py-4 max-lg:min-h-0 max-lg:overflow-x-clip max-lg:overflow-y-auto max-lg:overscroll-y-contain max-lg:pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] lg:max-w-6xl lg:px-8 lg:py-6"
+        >
           <PageTransition>
             {(displayLocation) => (
               <Routes location={displayLocation}>
@@ -237,8 +256,8 @@ function AppLayoutInner() {
         </main>
       </div>
 
-      {/* Mobile bottom nav + center FAB */}
-      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
+      {/* Mobile bottom nav + center FAB — fixed to viewport */}
+      <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/95 px-2 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-md lg:hidden">
         <div className="relative mx-auto grid h-[4.25rem] max-w-lg grid-cols-5 items-end">
           {mobileNav.slice(0, 2).map((item) => {
             const Icon = item.icon;
@@ -248,13 +267,10 @@ function AppLayoutInner() {
                 key={item.value}
                 type="button"
                 onClick={() => navigate(item.value)}
-                className={cn(
-                  'flex flex-col items-center justify-center gap-1 pb-2 pt-2 text-[11px] font-semibold',
-                  active ? 'text-brand' : 'text-ink-muted'
-                )}
+                className={mobileNavButtonClass(active)}
               >
-                <Icon size={22} strokeWidth={active ? 2.25 : 1.75} />
-                {item.label}
+                <Icon size={22} strokeWidth={active ? 2.25 : 1.75} className="shrink-0" />
+                <span className="max-w-full truncate">{item.label}</span>
               </button>
             );
           })}
@@ -282,13 +298,10 @@ function AppLayoutInner() {
                   if (item.value === 'more') setMoreOpen(true);
                   else navigate(item.value);
                 }}
-                className={cn(
-                  'flex flex-col items-center justify-center gap-1 pb-2 pt-2 text-[11px] font-semibold',
-                  active ? 'text-brand' : 'text-ink-muted'
-                )}
+                className={mobileNavButtonClass(active)}
               >
-                <Icon size={22} strokeWidth={active ? 2.25 : 1.75} />
-                {item.label}
+                <Icon size={22} strokeWidth={active ? 2.25 : 1.75} className="shrink-0" />
+                <span className="max-w-full truncate">{item.label}</span>
               </button>
             );
           })}

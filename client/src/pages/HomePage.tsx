@@ -134,7 +134,7 @@ export default function HomePage() {
         ))}
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex min-w-0 max-w-full gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {pipelineChips.map((chip) => (
           <FilterChip key={chip.key} onClick={() => navigate('/pipeline')}>
             {t(`home.${chip.key}`, { count: chip.count })}

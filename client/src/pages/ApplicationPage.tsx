@@ -397,7 +397,7 @@ export default function ApplicationPage() {
     !app.sentAt && !['sent', 'interview', 'rejected', 'offer', 'hired'].includes(app.status);
 
   return (
-    <Box>
+    <Box sx={{ maxWidth: '100%', minWidth: 0, overflowX: 'clip' }}>
       <PageBreadcrumbs
         items={[
           { label: t('nav.pipeline'), to: '/pipeline' },
@@ -505,7 +505,14 @@ export default function ApplicationPage() {
         )}
       </Box>
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto" sx={{ mb: 2 }}>
+      <Tabs
+        value={tab}
+        onChange={(_, v) => setTab(v)}
+        variant="scrollable"
+        scrollButtons="auto"
+        allowScrollButtonsMobile
+        sx={{ mb: 2, maxWidth: '100%', minWidth: 0 }}
+      >
         <Tab label={t('application.tabs.job')} />
         <Tab label={t('application.tabs.company')} />
         <Tab label={t('application.tabs.analysis')} />
@@ -537,7 +544,7 @@ export default function ApplicationPage() {
             <Card>
               <CardContent>
                 <Typography variant="subtitle2" gutterBottom>{t('application.job.matchAssessment')}</Typography>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.6 }}>
                   {analysis.matchAssessment}
                 </Typography>
               </CardContent>
@@ -618,7 +625,7 @@ export default function ApplicationPage() {
                 <Card>
                   <CardContent>
                     <Typography variant="subtitle2" gutterBottom>{t('application.analysis.matchAssessment')}</Typography>
-                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                    <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.6 }}>
                       {analysis.matchAssessment}
                     </Typography>
                   </CardContent>
@@ -745,7 +752,7 @@ export default function ApplicationPage() {
                           sx={{ mb: 2 }}
                         />
                       ) : (
-                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mb: 2 }}>
+                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', mb: 2 }}>
                           {doc.coverLetter.content}
                         </Typography>
                       )}
@@ -792,7 +799,7 @@ export default function ApplicationPage() {
                       {doc.cv.content?.trim() && (
                         <>
                           <Typography variant="subtitle2">{t('application.documents.cv')}</Typography>
-                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mb: 2 }}>{doc.cv.content}</Typography>
+                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', mb: 2 }}>{doc.cv.content}</Typography>
                         </>
                       )}
                       {doc.potentialImprovements && doc.potentialImprovements.length > 0 && (
@@ -891,12 +898,12 @@ export default function ApplicationPage() {
               {company?.description && (
                 <Card><CardContent>
                   <Typography variant="subtitle2">{t('application.interview.companyInfo')}</Typography>
-                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{company.description}</Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{company.description}</Typography>
                 </CardContent></Card>
               )}
               <Card><CardContent>
                 <Typography variant="subtitle2">{t('application.interview.companyResearch')}</Typography>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{app.interviewPrep.companyResearch}</Typography>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{app.interviewPrep.companyResearch}</Typography>
               </CardContent></Card>
               <Card><CardContent>
                 <Typography variant="subtitle2">{t('application.interview.elevatorPitch')}</Typography>

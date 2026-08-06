@@ -707,7 +707,7 @@ export default function CvTemplatesPage() {
             />
           )}
           {!viewerIsPdf && viewerText && (
-            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
               {viewerText}
             </Typography>
           )}

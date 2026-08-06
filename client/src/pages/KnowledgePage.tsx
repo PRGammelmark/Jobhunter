@@ -205,7 +205,7 @@ function AboutMeSection({
               </Box>
             </Box>
           ) : value.trim() ? (
-            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
               {value}
             </Typography>
           ) : (

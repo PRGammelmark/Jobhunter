@@ -140,6 +140,9 @@ export function FormattedJobText({ text }: FormattedJobTextProps) {
         display: 'flex',
         flexDirection: 'column',
         gap: 1.5,
+        maxWidth: '100%',
+        minWidth: 0,
+        overflowWrap: 'anywhere',
         '& ul, & ol': {
           m: 0,
           pl: 2.5,
@@ -191,7 +194,11 @@ export function FormattedJobText({ text }: FormattedJobTextProps) {
         }
 
         return (
-          <Typography key={i} variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.65 }}>
+          <Typography
+            key={i}
+            variant="body1"
+            sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', lineHeight: 1.65 }}
+          >
             {renderInline(block.text)}
           </Typography>
         );
