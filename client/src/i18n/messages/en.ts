@@ -663,5 +663,7 @@ export const en: Messages = {
     iosStep2: 'Scroll down and choose “Add to Home Screen”.',
     iosStep3: 'Tap “Add” to confirm.',
     androidManual: 'Open the browser menu (⋮) and choose “Install app” or “Add to Home screen”.',
+    portraitTitle: 'Rotate your phone',
+    portraitBody: 'ApplyPilot only supports portrait mode. Turn your device upright to continue.',
   },
 };

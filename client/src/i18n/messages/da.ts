@@ -661,6 +661,8 @@ export const da = {
     iosStep2: 'Scroll ned, og vælg «Føj til hjemmeskærm».',
     iosStep3: 'Tryk på «Tilføj» for at bekræfte.',
     androidManual: 'Åbn browserens menu (⋮), og vælg «Installer app» eller «Føj til startskærm».',
+    portraitTitle: 'Drej telefonen',
+    portraitBody: 'ApplyPilot understøtter kun portrættilstand. Vend din enhed lodret for at fortsætte.',
   },
 } as const;
 

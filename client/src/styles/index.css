@@ -82,7 +82,30 @@
   }
 }
 
+@keyframes portrait-tilt {
+  0%,
+  100% {
+    transform: rotate(0deg);
+  }
+  35% {
+    transform: rotate(-90deg);
+  }
+  65% {
+    transform: rotate(-90deg);
+  }
+}
+
 @layer utilities {
+  .portrait-tilt {
+    animation: portrait-tilt 1.6s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .portrait-tilt {
+      animation: none;
+    }
+  }
+
   .app-card {
     background: var(--color-surface);
     border: 1px solid rgb(232 234 239 / 0.9);
