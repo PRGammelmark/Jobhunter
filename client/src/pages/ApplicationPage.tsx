@@ -43,6 +43,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
 import WishlistButton from '../components/pipeline/WishlistButton';
+import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import {
   type Application,
   type ApplicationStatus,
@@ -396,6 +397,18 @@ export default function ApplicationPage() {
 
   return (
     <Box>
+      <PageBreadcrumbs
+        items={[
+          { label: t('nav.pipeline'), to: '/pipeline' },
+          ...(displayCompanyName
+            ? [{
+                label: displayCompanyName,
+                to: app.companyId ? `/companies/${app.companyId}` : undefined,
+              }]
+            : []),
+          { label: app.job.title },
+        ]}
+      />
       <Box sx={{ mb: 2, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
         <Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -403,14 +416,6 @@ export default function ApplicationPage() {
             <WishlistButton isWishlisted={!!app.isWishlisted} onToggle={toggleWishlist} />
           </Box>
           <Typography variant="h5" fontWeight={700} sx={{ mt: 1 }}>{app.job.title}</Typography>
-          <Typography
-            variant="body1"
-            color="primary"
-            sx={{ cursor: app.companyId ? 'pointer' : 'default' }}
-            onClick={() => app.companyId && navigate(`/companies/${app.companyId}`)}
-          >
-            {displayCompanyName}
-          </Typography>
         </Box>
         <IconButton
           size="small"

@@ -19,6 +19,7 @@ import {
 } from '@mui/material';
 import CheckIcon from '@mui/icons-material/Check';
 import { api } from '../services/api';
+import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import { normalizeSkillConfidence, type EmploymentDetails, type KnowledgeEntry, type KnowledgeEntryType } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
 
@@ -165,8 +166,16 @@ export default function KnowledgeEntryPage() {
     ? Boolean(entry.employment?.company?.trim() && entry.employment?.role?.trim())
     : Boolean(entry.title?.trim());
 
+  const crumbTitle = isNew ? t('knowledgeEntry.newTitle') : (entry.title?.trim() || '');
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pb: 4 }}>
+      <PageBreadcrumbs
+        items={[
+          { label: t('nav.knowledge'), to: '/knowledge' },
+          ...(crumbTitle ? [{ label: crumbTitle }] : []),
+        ]}
+      />
       <Typography variant="h5" fontWeight={700}>{isNew ? t('knowledgeEntry.newTitle') : entry.title}</Typography>
 
       <FormControl fullWidth>

@@ -11,6 +11,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { api } from '../services/api';
+import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import { useLocale } from '../i18n';
 
 export default function NewApplicationPage() {
@@ -41,6 +42,12 @@ export default function NewApplicationPage() {
 
   return (
     <Box>
+      <PageBreadcrumbs
+        items={[
+          { label: t('nav.pipeline'), to: '/pipeline' },
+          { label: t('newApplication.title') },
+        ]}
+      />
       <Typography variant="h5" fontWeight={700} gutterBottom>{t('newApplication.title')}</Typography>
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>

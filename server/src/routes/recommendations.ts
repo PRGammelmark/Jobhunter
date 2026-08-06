@@ -72,7 +72,7 @@ router.delete('/:id', async (req, res) => {
   if (item.originalFile?.fileId) {
     await storageService.deleteForTenant(item.originalFile.fileId.toString(), tenantId);
   } else if (item.originalFile?.storageKey) {
-    await storageService.deleteByKey(item.originalFile.storageKey);
+    await storageService.deleteByKey(item.originalFile.storageKey, tenantId);
   }
 
   res.json({ success: true });

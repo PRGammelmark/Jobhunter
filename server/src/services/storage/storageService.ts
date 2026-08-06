@@ -14,6 +14,12 @@ export interface UploadedFile {
   sizeBytes: number;
 }
 
+/**
+ * Object keys are always tenant-partitioned:
+ *   {tenantId}/{documentType}/[{subpath}/]{uuid}-{safeFileName}
+ *
+ * In MVP each user owns one tenant, so this is the logical user boundary in R2/local storage.
+ */
 class StorageService {
   private r2Client: S3Client | null = null;
 
@@ -37,9 +43,31 @@ class StorageService {
     return fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
   }
 
+  private sanitizePathSegment(segment: string): string {
+    return segment.replace(/[^a-zA-Z0-9_-]/g, '_');
+  }
+
   private buildStorageKey(tenantId: string, documentType: string, fileName: string): string {
-    const safeType = documentType.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const typePath = documentType
+      .split('/')
+      .map((segment) => this.sanitizePathSegment(segment))
+      .filter(Boolean)
+      .join('/');
+    const safeType = typePath || 'files';
     return `${tenantId}/${safeType}/${randomUUID()}-${this.sanitizeFileName(fileName)}`;
+  }
+
+  /** Ensures a stored key cannot be used across tenants (or via path traversal). */
+  private assertKeyBelongsToTenant(storageKey: string, tenantId: string): void {
+    const prefix = `${tenantId}/`;
+    if (
+      !storageKey ||
+      storageKey.includes('..') ||
+      storageKey.startsWith('/') ||
+      !storageKey.startsWith(prefix)
+    ) {
+      throw new Error('Ugyldig storage-nøgle for tenant');
+    }
   }
 
   async upload(
@@ -84,7 +112,10 @@ class StorageService {
     };
   }
 
-  async downloadByKey(storageKey: string): Promise<Buffer> {
+  async downloadByKey(storageKey: string, tenantId: string | Types.ObjectId): Promise<Buffer> {
+    const tenant = tenantId.toString();
+    this.assertKeyBelongsToTenant(storageKey, tenant);
+
     if (config.storage.type === 'local') {
       const fullPath = path.join(config.storage.localPath, storageKey);
       return fs.readFile(fullPath);
@@ -111,11 +142,14 @@ class StorageService {
       tenantId: new Types.ObjectId(tenantId.toString()),
     });
     if (!doc) throw new Error('Fil ikke fundet');
-    const buffer = await this.downloadByKey(doc.storageKey);
+    const buffer = await this.downloadByKey(doc.storageKey, tenantId);
     return { buffer, mimeType: doc.mimeType, fileName: doc.originalName };
   }
 
-  async deleteByKey(storageKey: string): Promise<void> {
+  async deleteByKey(storageKey: string, tenantId: string | Types.ObjectId): Promise<void> {
+    const tenant = tenantId.toString();
+    this.assertKeyBelongsToTenant(storageKey, tenant);
+
     if (config.storage.type === 'local') {
       const fullPath = path.join(config.storage.localPath, storageKey);
       await fs.unlink(fullPath).catch(() => undefined);
@@ -136,7 +170,7 @@ class StorageService {
       tenantId: new Types.ObjectId(tenantId.toString()),
     });
     if (doc) {
-      await this.deleteByKey(doc.storageKey);
+      await this.deleteByKey(doc.storageKey, tenantId);
     }
   }
 

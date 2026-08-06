@@ -205,10 +205,13 @@ export class CvKnowledgeExtractionService {
     const existing = template.parsedContent?.rawText?.trim();
     if (existing) return existing;
 
-    if (!template.originalFile?.storageKey) return '';
+    if (!template.originalFile?.storageKey || !template.tenantId) return '';
 
     try {
-      const buffer = await storageService.downloadByKey(template.originalFile.storageKey);
+      const buffer = await storageService.downloadByKey(
+        template.originalFile.storageKey,
+        template.tenantId
+      );
       const text = await extractTextFromBuffer(buffer, template.originalFile.mimeType);
       if (!text) return '';
 

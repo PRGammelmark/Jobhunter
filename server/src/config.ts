@@ -19,14 +19,17 @@ const defaultAllowedOrigins = [
 ];
 
 const allowedOrigins = Array.from(
-  new Set([
-    ...defaultAllowedOrigins,
-    clientUrl,
-    ...(process.env.ALLOWED_ORIGINS || '')
-      .split(',')
-      .map((o) => o.trim())
-      .filter(Boolean),
-  ])
+  new Set(
+    [
+      ...defaultAllowedOrigins,
+      clientUrl,
+      process.env.RENDER_EXTERNAL_URL,
+      ...(process.env.ALLOWED_ORIGINS || '')
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean),
+    ].filter((o): o is string => Boolean(o))
+  )
 );
 
 export const config = {

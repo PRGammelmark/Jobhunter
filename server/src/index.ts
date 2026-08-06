@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -52,6 +54,20 @@ app.use('/api/application-templates', applicationTemplatesRouter);
 app.use('/api/recommendations', recommendationsRouter);
 app.use('/api/applications', applicationsRouter);
 app.use('/api', dashboardRouter);
+
+app.use('/api', (_req, res) => {
+  res.status(404).json({ error: 'Not found' });
+});
+
+const clientDist = path.resolve(__dirname, '../../client/dist');
+const clientIndex = path.join(clientDist, 'index.html');
+if (fs.existsSync(clientIndex)) {
+  app.use(express.static(clientDist, { index: false }));
+  app.get('*', (_req, res) => {
+    res.sendFile(clientIndex);
+  });
+  console.log(`Serving client from ${clientDist}`);
+}
 
 async function start() {
   if (config.storage.type === 'r2') {

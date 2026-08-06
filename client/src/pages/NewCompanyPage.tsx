@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { api } from '../services/api';
+import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import { useLocale } from '../i18n';
 
 type CompanyForm = {
@@ -110,6 +111,12 @@ export default function NewCompanyPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pb: 4 }}>
+      <PageBreadcrumbs
+        items={[
+          { label: t('nav.companies'), to: '/companies' },
+          { label: t('newCompany.title') },
+        ]}
+      />
       <Typography variant="h5" fontWeight={700}>{t('newCompany.title')}</Typography>
       <Typography variant="body2" color="text.secondary">
         {t('newCompany.subtitle')}

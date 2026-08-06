@@ -402,7 +402,7 @@ router.delete('/:id/documents/:documentSetId', async (req, res) => {
   const pdfKeys = [docSet.cv.pdfFile?.storageKey, docSet.coverLetter.pdfFile?.storageKey].filter(
     (key): key is string => !!key
   );
-  await Promise.all(pdfKeys.map((key) => storageService.deleteByKey(key)));
+  await Promise.all(pdfKeys.map((key) => storageService.deleteByKey(key, tenantId)));
   await docSet.deleteOne();
 
   const remaining = await DocumentSet.countDocuments({ tenantId, applicationId: req.params.id });
@@ -467,8 +467,11 @@ router.post('/:id/send-email', async (req, res) => {
       return res.status(400).json({ error: 'PDF-filer mangler — kør export først' });
     }
 
-    const cvBuffer = await storageService.downloadByKey(docSet.cv.pdfFile.storageKey);
-    const coverBuffer = await storageService.downloadByKey(docSet.coverLetter.pdfFile.storageKey);
+    const cvBuffer = await storageService.downloadByKey(docSet.cv.pdfFile.storageKey, tenantId);
+    const coverBuffer = await storageService.downloadByKey(
+      docSet.coverLetter.pdfFile.storageKey,
+      tenantId
+    );
 
     const attachments = [
       { filename: docSet.cv.pdfFile.fileName, content: cvBuffer, mimeType: 'application/pdf' },
@@ -493,7 +496,7 @@ router.post('/:id/send-email', async (req, res) => {
         if (!rec.originalFile?.storageKey) {
           return res.status(400).json({ error: `Anbefalingen "${rec.name}" mangler fil` });
         }
-        const buffer = await storageService.downloadByKey(rec.originalFile.storageKey);
+        const buffer = await storageService.downloadByKey(rec.originalFile.storageKey, tenantId);
         attachments.push({
           filename: rec.originalFile.fileName || `${rec.name}.pdf`,
           content: buffer,

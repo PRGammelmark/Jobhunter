@@ -484,25 +484,49 @@ export {
   type AppLanguage,
 } from './aiPrompts';
 
+export type DashboardAttentionReason =
+  | 'ai_question'
+  | 'send_application'
+  | 'follow_up'
+  | 'review';
+
+export interface DashboardApplicationSummary {
+  _id: string;
+  title: string;
+  companyName: string;
+  status: ApplicationStatus;
+  updatedAt: string;
+}
+
+export interface DashboardAttentionItem extends DashboardApplicationSummary {
+  reason: DashboardAttentionReason;
+  unansweredQuestions?: number;
+}
+
+export interface DashboardUpcomingItem {
+  _id: string;
+  title: string;
+  companyName: string;
+  type: 'interview' | 'deadline';
+  at: string;
+}
+
 export interface DashboardData {
   pipeline: {
     active: number;
+    inProgress: number;
+    readyForReview: number;
     readyToSend: number;
+    sent: number;
     interviews: number;
     offers: number;
   };
-  tasks: Array<{
-    id: string;
-    type: 'ai_question' | 'send_application' | 'follow_up' | 'update_cv' | 'review';
-    label: string;
-    applicationId?: string;
-    companyName?: string;
-  }>;
-  recentCompanies: Array<{
-    _id: string;
-    name: string;
-    lastActivityAt: string;
-  }>;
+  /** Applications that need a concrete next step from the user */
+  needsAttention: DashboardAttentionItem[];
+  /** Upcoming interviews and approaching deadlines */
+  upcoming: DashboardUpcomingItem[];
+  /** Recently updated applications for quick resume */
+  recentApplications: DashboardApplicationSummary[];
 }
 
 export interface Statistics {

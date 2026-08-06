@@ -29,6 +29,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
 import WishlistButton from '../components/pipeline/WishlistButton';
+import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import type { Application, Company } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
 
@@ -191,6 +192,12 @@ export default function CompanyPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pb: 4 }}>
+      <PageBreadcrumbs
+        items={[
+          { label: t('nav.companies'), to: '/companies' },
+          { label: company.name },
+        ]}
+      />
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
         <Typography variant="h5" fontWeight={700}>{company.name}</Typography>
         {!editing && (

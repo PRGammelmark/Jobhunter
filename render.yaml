@@ -1,0 +1,33 @@
+# Single Web Service: API + built React client (same origin → cookies/CSRF work).
+services:
+  - type: web
+    name: jobhunter
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run build:render
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: CLIENT_URL
+        sync: false
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 12h
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: STORAGE_TYPE
+        value: r2
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        sync: false
+      - key: ENCRYPTION_KEY
+        sync: false
