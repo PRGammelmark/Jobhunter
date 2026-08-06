@@ -634,4 +634,15 @@ export const en: Messages = {
   formattedJobText: {
     empty: 'No content yet',
   },
+  pwa: {
+    installTitle: 'Install ApplyPilot',
+    installBody: 'Add the app to your home screen for quicker access — just like a native app.',
+    installCta: 'Install',
+    dismiss: 'Not now',
+    gotIt: 'Got it',
+    iosStep1: 'Tap the Share button (square with an up arrow) in Safari.',
+    iosStep2: 'Scroll down and choose “Add to Home Screen”.',
+    iosStep3: 'Tap “Add” to confirm.',
+    androidManual: 'Open the browser menu (⋮) and choose “Install app” or “Add to Home screen”.',
+  },
 };

@@ -632,6 +632,17 @@ export const da = {
   formattedJobText: {
     empty: 'Intet indhold endnu',
   },
+  pwa: {
+    installTitle: 'Installer ApplyPilot',
+    installBody: 'Tilføj appen til din hjemmeskærm for hurtigere adgang — som en rigtig app.',
+    installCta: 'Installer',
+    dismiss: 'Ikke nu',
+    gotIt: 'Forstået',
+    iosStep1: 'Tryk på Del-knappen (firkant med pil op) i Safari.',
+    iosStep2: 'Scroll ned, og vælg «Føj til hjemmeskærm».',
+    iosStep3: 'Tryk på «Tilføj» for at bekræfte.',
+    androidManual: 'Åbn browserens menu (⋮), og vælg «Installer app» eller «Føj til startskærm».',
+  },
 } as const;
 
 type WidenStringLeaves<T> = {

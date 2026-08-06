@@ -5,6 +5,7 @@ import { ThemeProvider, CssBaseline } from '@mui/material';
 import App from './App';
 import { AuthProvider } from './auth/AuthContext';
 import { LocaleProvider } from './i18n';
+import PwaInstallPrompt from './components/PwaInstallPrompt';
 import { theme } from './theme';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
@@ -15,6 +16,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <AuthProvider>
           <LocaleProvider>
             <App />
+            <PwaInstallPrompt />
           </LocaleProvider>
         </AuthProvider>
       </BrowserRouter>
