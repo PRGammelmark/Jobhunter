@@ -1,12 +1,12 @@
 import { Link, Navigate, Outlet, Route, Routes, useNavigate, useLocation } from 'react-router-dom';
 import { useState } from 'react';
 import {
-  Brain,
   BriefcaseBusiness,
   ChartColumn,
   FileText,
   Home,
   LayoutGrid,
+  Lightbulb,
   MoreHorizontal,
   Plus,
   Settings,
@@ -107,14 +107,14 @@ function AppLayoutInner() {
   const mobileNav = [
     { label: t('nav.home'), value: '/', icon: Home },
     { label: t('nav.pipeline'), value: '/pipeline', icon: BriefcaseBusiness },
-    { label: t('nav.knowledge'), value: '/knowledge', icon: Brain },
+    { label: t('nav.knowledge'), value: '/knowledge', icon: Lightbulb },
     { label: t('nav.more'), value: 'more', icon: MoreHorizontal },
   ];
 
   const desktopNav = [
     { label: t('nav.home'), value: '/', icon: Home },
     { label: t('nav.pipeline'), value: '/pipeline', icon: LayoutGrid },
-    { label: t('nav.knowledge'), value: '/knowledge', icon: Brain },
+    { label: t('nav.knowledge'), value: '/knowledge', icon: Lightbulb },
     { label: t('nav.cvTemplates'), value: '/cv', icon: FileText },
     { label: t('nav.companies'), value: '/companies', icon: Building2 },
     { label: t('nav.statistics'), value: '/statistics', icon: ChartColumn },

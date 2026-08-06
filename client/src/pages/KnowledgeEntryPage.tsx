@@ -16,8 +16,14 @@ import {
   CircularProgress,
   FormControlLabel,
   Switch,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import CheckIcon from '@mui/icons-material/Check';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { api } from '../services/api';
 import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import { normalizeSkillConfidence, type EmploymentDetails, type KnowledgeEntry, type KnowledgeEntryType } from '@career-intelligence/shared';
@@ -80,6 +86,9 @@ export default function KnowledgeEntryPage() {
   const [responsibilityInput, setResponsibilityInput] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(Boolean((location.state as { justSaved?: boolean } | null)?.justSaved));
+  const [deleteDialog, setDeleteDialog] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const requestedType = searchParams.get('type');
   const buildEmploymentTitle = (employment?: EmploymentDetails): string => {
@@ -147,6 +156,20 @@ export default function KnowledgeEntryPage() {
     }
   };
 
+  const confirmDelete = async () => {
+    if (!id || isNew) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await api.deleteKnowledge(id);
+      navigate('/knowledge');
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : t('knowledgeEntry.deleteDialog.error'));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const addKeyword = () => {
     if (keywordInput.trim()) {
       setEntry({ ...entry, keywords: [...(entry.keywords || []), keywordInput.trim()] });
@@ -177,7 +200,24 @@ export default function KnowledgeEntryPage() {
           ...(crumbTitle ? [{ label: crumbTitle }] : []),
         ]}
       />
-      <PageHeader title={isNew ? t('knowledgeEntry.newTitle') : entry.title} />
+      <PageHeader
+        title={isNew ? t('knowledgeEntry.newTitle') : entry.title}
+        action={
+          !isNew ? (
+            <Button
+              color="error"
+              startIcon={<DeleteOutlineIcon />}
+              onClick={() => {
+                setDeleteError(null);
+                setDeleteDialog(true);
+              }}
+              title={t('knowledgeEntry.deleteTitle')}
+            >
+              {t('knowledgeEntry.delete')}
+            </Button>
+          ) : undefined
+        }
+      />
 
       <FormControl fullWidth>
         <InputLabel>{t('knowledgeEntry.type')}</InputLabel>
@@ -425,6 +465,30 @@ export default function KnowledgeEntryPage() {
       >
         {saving ? t('knowledgeEntry.saving') : saved ? t('knowledgeEntry.saved') : t('knowledgeEntry.save')}
       </Button>
+
+      <Dialog open={deleteDialog} onClose={() => !deleting && setDeleteDialog(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>{t('knowledgeEntry.deleteDialog.title')}</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {entry.title?.trim()
+              ? t('knowledgeEntry.deleteDialog.confirm', { title: entry.title })
+              : t('knowledgeEntry.deleteDialog.confirmUntitled')}
+          </DialogContentText>
+          {deleteError && (
+            <Typography color="error" variant="body2" sx={{ mt: 1.5 }}>
+              {deleteError}
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialog(false)} disabled={deleting}>
+            {t('knowledgeEntry.deleteDialog.cancel')}
+          </Button>
+          <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting}>
+            {deleting ? <CircularProgress size={16} /> : t('knowledgeEntry.deleteDialog.confirmAction')}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

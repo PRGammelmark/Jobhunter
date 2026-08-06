@@ -58,11 +58,16 @@ router.put('/:id', async (req, res) => {
 });
 
 router.delete('/:id', async (req, res) => {
+  const tenantId = req.user!.tenantId;
   const entry = await KnowledgeEntry.findOneAndDelete({
     _id: req.params.id,
-    tenantId: req.user!.tenantId,
+    tenantId,
   });
   if (!entry) return res.status(404).json({ error: 'Entry ikke fundet' });
+  await KnowledgeEntry.updateMany(
+    { tenantId, relatedEntryIds: entry._id },
+    { $pull: { relatedEntryIds: entry._id } }
+  );
   res.json({ success: true });
 });
 
