@@ -2,6 +2,7 @@ import type { Messages } from './da';
 
 export const en: Messages = {
   common: {
+    appName: 'ApplyPilot',
     cancel: 'Cancel',
     save: 'Save',
     delete: 'Delete',

@@ -2,7 +2,7 @@ export type AppLocale = 'da' | 'en';
 
 export const APP_LOCALES: AppLocale[] = ['da', 'en'];
 
-export const LOCALE_STORAGE_KEY = 'jobhunter.locale';
+export const LOCALE_STORAGE_KEY = 'applypilot.locale';
 
 export function isAppLocale(value: unknown): value is AppLocale {
   return value === 'da' || value === 'en';

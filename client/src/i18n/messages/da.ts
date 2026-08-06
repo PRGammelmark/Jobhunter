@@ -1,5 +1,6 @@
 export const da = {
   common: {
+    appName: 'ApplyPilot',
     cancel: 'Annuller',
     save: 'Gem',
     delete: 'Slet',

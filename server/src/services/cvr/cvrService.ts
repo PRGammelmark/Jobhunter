@@ -34,7 +34,7 @@ interface CvrApiResponse {
 }
 
 const CVR_API_URL = 'https://cvrapi.dk/api';
-const USER_AGENT = 'Jobhunter - career-intelligence-app';
+const USER_AGENT = 'ApplyPilot - career-intelligence-app';
 
 export function isCvrNumber(value: string): boolean {
   return /^\d{8}$/.test(value.replace(/\s/g, ''));

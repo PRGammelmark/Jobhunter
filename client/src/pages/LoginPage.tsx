@@ -45,7 +45,7 @@ export default function LoginPage() {
       </Box>
       <Paper sx={{ p: 4, width: '100%', maxWidth: 400 }} elevation={2}>
         <Typography variant="h5" fontWeight={700} gutterBottom>
-          Jobhunter
+          {t('common.appName')}
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
           {t('login.subtitle')}

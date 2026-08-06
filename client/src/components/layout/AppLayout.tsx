@@ -79,7 +79,7 @@ export default function AppLayout() {
               cursor: 'pointer',
             }}
           >
-            Jobhunter
+            {t('common.appName')}
           </Typography>
           <LanguageSwitcher />
         </Toolbar>

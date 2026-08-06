@@ -41,7 +41,7 @@ app.use(cookieParser());
 app.use(csrfProtection);
 
 app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', name: 'Jobhunter API' });
+  res.json({ status: 'ok', name: 'ApplyPilot API' });
 });
 
 app.use('/api/auth', authRouter);
@@ -105,7 +105,7 @@ async function start() {
   }
 
   const server = app.listen(config.port, () => {
-    console.log(`Jobhunter API running on http://localhost:${config.port}`);
+    console.log(`ApplyPilot API running on http://localhost:${config.port}`);
   });
 
   const shutdown = async () => {

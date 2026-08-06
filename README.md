@@ -1,4 +1,4 @@
-# Jobhunter
+# ApplyPilot
 
 Dit personlige **AI Career OS** — pipeline-CRM, Knowledge Base, Company Memory, AI-sparringspartner og ansøgningsgenerator.
 
