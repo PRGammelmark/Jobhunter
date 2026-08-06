@@ -25,6 +25,7 @@ import {
   type KnowledgeEntryType,
 } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import { PageHeader } from '../ui';
 
 const TYPE_ORDER: KnowledgeEntryType[] = [
   'employment',
@@ -246,10 +247,7 @@ export default function KnowledgePage() {
 
   return (
     <Box sx={{ pb: 10 }}>
-      <Typography variant="h5" fontWeight={700} gutterBottom>{t('knowledge.title')}</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-        {t('knowledge.subtitle')}
-      </Typography>
+      <PageHeader title={t('knowledge.title')} subtitle={t('knowledge.subtitle')} />
 
       {loading ? (
         [1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={80} sx={{ mb: 1 }} />)
@@ -307,7 +305,15 @@ export default function KnowledgePage() {
         variant="extended"
         color="primary"
         aria-label={t('knowledge.fab.addAria')}
-        sx={{ position: 'fixed', bottom: 80, right: 16, zIndex: 1100 }}
+        sx={{
+          position: 'fixed',
+          bottom: 'calc(5.5rem + env(safe-area-inset-bottom))',
+          right: 16,
+          zIndex: 1100,
+          bgcolor: 'primary.main',
+          color: 'primary.contrastText',
+          '&:hover': { bgcolor: 'primary.dark' },
+        }}
         onClick={() => navigate('/knowledge/new')}
       >
         <AddIcon sx={{ mr: 1 }} />

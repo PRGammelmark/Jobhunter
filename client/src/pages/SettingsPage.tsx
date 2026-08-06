@@ -19,6 +19,7 @@ import {
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import GoogleIcon from '@mui/icons-material/Google';
 import MailOutlineIcon from '@mui/icons-material/MailOutline';
+import { PageHeader } from '../ui';
 import { api } from '../services/api';
 import {
   AI_MODELS,
@@ -131,7 +132,7 @@ export default function SettingsPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, pb: 4 }}>
-      <Typography variant="h5" fontWeight={700}>{t('settings.title')}</Typography>
+      <PageHeader title={t('settings.title')} />
       {saved && <Alert severity="success">{t('settings.saved')}</Alert>}
       {notice && <Alert severity={notice.type} onClose={() => setNotice(null)}>{notice.text}</Alert>}
 

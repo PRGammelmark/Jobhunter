@@ -1,11 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
 export default defineConfig({
   plugins: [
     react(),
+    tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/icon-180.png', 'icons/icon-192.png', 'icons/icon-512.png'],
@@ -13,8 +15,8 @@ export default defineConfig({
         name: 'ApplyPilot',
         short_name: 'ApplyPilot',
         description: 'Job application assistant',
-        theme_color: '#1a1a2e',
-        background_color: '#1a1a2e',
+        theme_color: '#ff5722',
+        background_color: '#f4f5f7',
         display: 'standalone',
         orientation: 'portrait-primary',
         start_url: '/',

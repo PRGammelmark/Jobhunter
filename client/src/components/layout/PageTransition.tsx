@@ -1,8 +1,18 @@
-import { useEffect, useRef, useState, type ReactNode, type TransitionEvent } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+  type TransitionEvent,
+} from 'react';
 import { useLocation, type Location } from 'react-router-dom';
-import { Box } from '@mui/material';
 
-const FADE_MS = 180;
+export const PAGE_FADE_MS = 180;
 
 function prefersReducedMotion() {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -12,11 +22,29 @@ function sameLocation(a: Location, b: Location) {
   return a.pathname === b.pathname && a.search === b.search;
 }
 
-interface Props {
-  children: (location: Location) => ReactNode;
+type PageTransitionContextValue = {
+  displayLocation: Location;
+  visible: boolean;
+  fadeMs: number;
+  style: CSSProperties;
+  onTransitionEnd: (event: TransitionEvent<HTMLElement>) => void;
+};
+
+const PageTransitionContext = createContext<PageTransitionContextValue | null>(null);
+
+export function usePageTransition() {
+  const ctx = useContext(PageTransitionContext);
+  if (!ctx) throw new Error('usePageTransition must be used within PageTransitionProvider');
+  return ctx;
 }
 
-export default function PageTransition({ children }: Props) {
+/** Optional: returns null outside provider (e.g. login). */
+export function usePageTransitionStyle(): CSSProperties | undefined {
+  const ctx = useContext(PageTransitionContext);
+  return ctx?.style;
+}
+
+export function PageTransitionProvider({ children }: { children: ReactNode }) {
   const location = useLocation();
   const [displayLocation, setDisplayLocation] = useState(location);
   const [visible, setVisible] = useState(true);
@@ -25,21 +53,21 @@ export default function PageTransition({ children }: Props) {
   const enterFrameRef = useRef(0);
   locationRef.current = location;
 
-  const reveal = () => {
+  const reveal = useCallback(() => {
     cancelAnimationFrame(enterFrameRef.current);
     enterFrameRef.current = requestAnimationFrame(() => {
       enterFrameRef.current = requestAnimationFrame(() => {
         setVisible(true);
       });
     });
-  };
+  }, []);
 
-  const finishExit = () => {
+  const finishExit = useCallback(() => {
     if (!exitingRef.current) return;
     exitingRef.current = false;
     setDisplayLocation(locationRef.current);
     reveal();
-  };
+  }, [reveal]);
 
   useEffect(() => {
     if (sameLocation(location, displayLocation)) return;
@@ -51,10 +79,8 @@ export default function PageTransition({ children }: Props) {
       return;
     }
 
-    // Already fading out — keep old page mounted; finishExit reads locationRef.
     if (exitingRef.current) return;
 
-    // Hidden between swap and fade-in — retarget without flashing.
     if (!visible) {
       setDisplayLocation(location);
       reveal();
@@ -63,34 +89,63 @@ export default function PageTransition({ children }: Props) {
 
     exitingRef.current = true;
     setVisible(false);
-  }, [location, displayLocation, visible]);
+  }, [location, displayLocation, visible, reveal]);
 
   useEffect(() => {
     if (visible || !exitingRef.current) return;
-    const timer = window.setTimeout(finishExit, FADE_MS + 50);
+    const timer = window.setTimeout(finishExit, PAGE_FADE_MS + 50);
     return () => window.clearTimeout(timer);
-  }, [visible, displayLocation]);
+  }, [visible, displayLocation, finishExit]);
 
   useEffect(() => () => cancelAnimationFrame(enterFrameRef.current), []);
 
-  const onTransitionEnd = (event: TransitionEvent<HTMLDivElement>) => {
-    if (event.target !== event.currentTarget || event.propertyName !== 'opacity') return;
-    finishExit();
-  };
+  const onTransitionEnd = useCallback(
+    (event: TransitionEvent<HTMLElement>) => {
+      if (event.target !== event.currentTarget || event.propertyName !== 'opacity') return;
+      finishExit();
+    },
+    [finishExit]
+  );
+
+  const style = useMemo<CSSProperties>(
+    () => ({
+      opacity: visible ? 1 : 0,
+      transition: `opacity ${PAGE_FADE_MS}ms ease`,
+      willChange: 'opacity',
+    }),
+    [visible]
+  );
+
+  const value = useMemo(
+    () => ({
+      displayLocation,
+      visible,
+      fadeMs: PAGE_FADE_MS,
+      style,
+      onTransitionEnd,
+    }),
+    [displayLocation, visible, style, onTransitionEnd]
+  );
 
   return (
-    <Box
+    <PageTransitionContext.Provider value={value}>{children}</PageTransitionContext.Provider>
+  );
+}
+
+interface ContentProps {
+  children: (location: Location) => ReactNode;
+}
+
+export default function PageTransition({ children }: ContentProps) {
+  const { displayLocation, style, onTransitionEnd } = usePageTransition();
+
+  return (
+    <div
       onTransitionEnd={onTransitionEnd}
-      sx={{
-        opacity: visible ? 1 : 0,
-        transition: `opacity ${FADE_MS}ms ease`,
-        willChange: 'opacity',
-        '@media (prefers-reduced-motion: reduce)': {
-          transition: 'none',
-        },
-      }}
+      className="motion-reduce:transition-none"
+      style={style}
     >
       {children(displayLocation)}
-    </Box>
+    </div>
   );
 }

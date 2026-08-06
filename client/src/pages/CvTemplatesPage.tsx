@@ -37,6 +37,7 @@ import type {
   KnowledgeEntryDraft,
 } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import { PageHeader } from '../ui';
 
 type TemplateItem = CvTemplate | ApplicationTemplate;
 type DeleteTarget =
@@ -328,10 +329,7 @@ export default function CvTemplatesPage() {
 
   return (
     <Box>
-      <Typography variant="h5" fontWeight={700} gutterBottom>{t('cvTemplates.title')}</Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {t('cvTemplates.subtitle')}
-      </Typography>
+      <PageHeader title={t('cvTemplates.title')} subtitle={t('cvTemplates.subtitle')} />
 
       <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }} variant="scrollable" scrollButtons="auto">
         <Tab label={t('cvTemplates.tabs.cvs')} />

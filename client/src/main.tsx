@@ -7,6 +7,7 @@ import { AuthProvider } from './auth/AuthContext';
 import { LocaleProvider } from './i18n';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
 import { theme } from './theme';
+import './styles/index.css';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

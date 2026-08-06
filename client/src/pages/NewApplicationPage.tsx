@@ -1,18 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Typography,
-  TextField,
-  Button,
-  Tabs,
-  Tab,
-  Alert,
-  CircularProgress,
-} from '@mui/material';
+import { LoaderCircle } from 'lucide-react';
 import { api } from '../services/api';
 import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import { useLocale } from '../i18n';
+import { Alert, Button, Card, Field, FilterChip, Input, PageHeader, Textarea } from '../ui';
 
 export default function NewApplicationPage() {
   const navigate = useNavigate();
@@ -41,57 +33,67 @@ export default function NewApplicationPage() {
   };
 
   return (
-    <Box>
+    <div>
       <PageBreadcrumbs
         items={[
           { label: t('nav.pipeline'), to: '/pipeline' },
           { label: t('newApplication.title') },
         ]}
       />
-      <Typography variant="h5" fontWeight={700} gutterBottom>{t('newApplication.title')}</Typography>
+      <PageHeader title={t('newApplication.title')} />
 
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2 }}>
-        <Tab label={t('newApplication.tabLink')} />
-        <Tab label={t('newApplication.tabManual')} />
-      </Tabs>
+      <div className="mb-4 flex gap-2">
+        <FilterChip active={tab === 0} onClick={() => setTab(0)}>
+          {t('newApplication.tabLink')}
+        </FilterChip>
+        <FilterChip active={tab === 1} onClick={() => setTab(1)}>
+          {t('newApplication.tabManual')}
+        </FilterChip>
+      </div>
 
-      {tab === 0 ? (
-        <TextField
-          fullWidth
-          label={t('newApplication.jobLink')}
-          placeholder="https://www.jobindex.dk/..."
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          sx={{ mb: 2 }}
-        />
-      ) : (
-        <>
-          <TextField fullWidth label={t('newApplication.jobTitle')} value={title} onChange={(e) => setTitle(e.target.value)} sx={{ mb: 2 }} />
-          <TextField fullWidth label={t('newApplication.company')} value={companyName} onChange={(e) => setCompanyName(e.target.value)} sx={{ mb: 2 }} />
-          <TextField
-            fullWidth
-            multiline
-            rows={8}
-            label={t('newApplication.jobText')}
-            value={manualText}
-            onChange={(e) => setManualText(e.target.value)}
-            sx={{ mb: 2 }}
-          />
-        </>
+      <Card className="mb-4">
+        {tab === 0 ? (
+          <Field label={t('newApplication.jobLink')}>
+            <Input
+              placeholder="https://www.jobindex.dk/..."
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+            />
+          </Field>
+        ) : (
+          <div className="flex flex-col gap-4">
+            <Field label={t('newApplication.jobTitle')}>
+              <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+            </Field>
+            <Field label={t('newApplication.company')}>
+              <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
+            </Field>
+            <Field label={t('newApplication.jobText')}>
+              <Textarea
+                rows={8}
+                value={manualText}
+                onChange={(e) => setManualText(e.target.value)}
+              />
+            </Field>
+          </div>
+        )}
+      </Card>
+
+      {error && (
+        <Alert tone="error" className="mb-4">
+          {error}
+        </Alert>
       )}
 
-      {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-
       <Button
-        variant="contained"
         fullWidth
-        size="large"
+        size="lg"
         disabled={loading || (tab === 0 ? !url : !manualText)}
         onClick={handleSubmit}
-        startIcon={loading ? <CircularProgress size={20} color="inherit" /> : undefined}
+        leftIcon={loading ? <LoaderCircle size={18} className="animate-spin" /> : undefined}
       >
         {loading ? t('newApplication.creating') : t('newApplication.create')}
       </Button>
-    </Box>
+    </div>
   );
 }

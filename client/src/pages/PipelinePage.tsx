@@ -1,59 +1,26 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Box,
-  Card,
-  CardActionArea,
-  CardContent,
-  Typography,
-  Tabs,
-  Tab,
-  Skeleton,
-  IconButton,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Button,
-  CircularProgress,
-} from '@mui/material';
-import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
+import { Building2, LoaderCircle, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
 import WishlistButton from '../components/pipeline/WishlistButton';
 import { APPLICATION_STATUSES, type Application, type ApplicationStatus } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
-
-function TabCountLabel({ label, count }: { label: string; count: number }) {
-  return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-      <Box component="span">{label}</Box>
-      {count > 0 && (
-        <Box
-          component="span"
-          sx={{
-            minWidth: 18,
-            height: 18,
-            px: 0.5,
-            borderRadius: 9,
-            bgcolor: 'primary.main',
-            color: 'primary.contrastText',
-            fontSize: 11,
-            fontWeight: 600,
-            lineHeight: '18px',
-            textAlign: 'center',
-          }}
-        >
-          {count}
-        </Box>
-      )}
-    </Box>
-  );
-}
+import {
+  Button,
+  Card,
+  Dialog,
+  DialogCancelButton,
+  EmptyState,
+  FilterChip,
+  IconButton,
+  PageHeader,
+  Skeleton,
+} from '../ui';
 
 export default function PipelinePage() {
   const navigate = useNavigate();
-  const { t } = useLocale();
+  const { t, formatDate } = useLocale();
   const [applications, setApplications] = useState<Application[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | ApplicationStatus>('all');
@@ -103,96 +70,117 @@ export default function PipelinePage() {
   };
 
   return (
-    <Box>
-      <Typography variant="h5" fontWeight={700} gutterBottom>{t('pipeline.title')}</Typography>
+    <div>
+      <PageHeader title={t('pipeline.title')} subtitle={t('pipeline.subtitle')} />
 
-      <Tabs
-        value={filter}
-        onChange={(_, v) => setFilter(v)}
-        variant="scrollable"
-        scrollButtons="auto"
-        sx={{ mb: 2 }}
-      >
-        <Tab
-          label={<TabCountLabel label={t('pipeline.all')} count={applications.length} />}
-          value="all"
-          sx={{ minWidth: 'auto', px: 1.5 }}
-        />
+      <div className="mb-4 flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <FilterChip
+          active={filter === 'all'}
+          count={applications.length}
+          onClick={() => setFilter('all')}
+        >
+          {t('pipeline.all')}
+        </FilterChip>
         {APPLICATION_STATUSES.map((s) => (
-          <Tab
+          <FilterChip
             key={s}
-            label={<TabCountLabel label={t(`status.${s}`)} count={statusCounts[s]} />}
-            value={s}
-            sx={{ minWidth: 'auto', px: 1.5 }}
-          />
+            active={filter === s}
+            count={statusCounts[s]}
+            onClick={() => setFilter(s)}
+          >
+            {t(`status.${s}`)}
+          </FilterChip>
         ))}
-      </Tabs>
+      </div>
 
       {loading ? (
-        [1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={100} sx={{ mb: 1 }} />)
+        <div className="flex flex-col gap-3">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-28" />
+          ))}
+        </div>
       ) : filtered.length === 0 ? (
-        <Typography color="text.secondary">{t('pipeline.empty')}</Typography>
+        <EmptyState>{t('pipeline.empty')}</EmptyState>
       ) : (
-        filtered.map((app) => (
-          <Card key={app._id} sx={{ mb: 1.5 }}>
-            <Box sx={{ display: 'flex', alignItems: 'stretch' }}>
-              <CardActionArea onClick={() => navigate(`/applications/${app._id}`)} sx={{ flex: 1 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
-                    <Box>
-                      <Typography variant="subtitle1" fontWeight={600}>{app.job.title}</Typography>
-                      <Typography variant="body2" color="text.secondary">{app.job.companyName}</Typography>
-                    </Box>
-                    <StatusBadge status={app.status} />
-                  </Box>
-                  {app.job.summary && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }} noWrap>
-                      {app.job.summary.slice(0, 100)}...
-                    </Typography>
-                  )}
-                </CardContent>
-              </CardActionArea>
-              <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', pr: 1, gap: 0 }}>
-                <WishlistButton
-                  isWishlisted={!!app.isWishlisted}
-                  onToggle={() => toggleWishlist(app)}
-                />
-                <IconButton
-                  size="small"
-                  color="error"
-                  aria-label={t('pipeline.deleteAria', { title: app.job.title })}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setToDelete(app);
-                  }}
+        <div className="flex flex-col gap-3">
+          {filtered.map((app) => (
+            <Card key={app._id} padding="none" className="overflow-hidden">
+              <div className="flex items-stretch">
+                <button
+                  type="button"
+                  onClick={() => navigate(`/applications/${app._id}`)}
+                  className="min-w-0 flex-1 p-4 text-left transition-colors hover:bg-canvas/70"
                 >
-                  <DeleteOutlineIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            </Box>
-          </Card>
-        ))
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span className="mt-0.5 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-canvas text-ink-secondary">
+                        <Building2 size={18} strokeWidth={1.75} />
+                      </span>
+                      <div className="min-w-0">
+                        <div className="truncate text-[15px] font-bold text-ink">
+                          {app.job.title}
+                        </div>
+                        <div className="truncate text-sm text-ink-secondary">
+                          {app.job.companyName}
+                        </div>
+                        {app.job.summary && (
+                          <div className="mt-1 line-clamp-1 text-sm text-ink-muted">
+                            {app.job.summary.slice(0, 100)}
+                            {app.job.summary.length > 100 ? '…' : ''}
+                          </div>
+                        )}
+                        <div className="mt-2 text-xs text-ink-muted">
+                          {t('home.updatedAt', { date: formatDate(app.updatedAt) })}
+                        </div>
+                      </div>
+                    </div>
+                    <StatusBadge status={app.status} />
+                  </div>
+                </button>
+                <div className="flex flex-col items-center justify-center gap-0 border-l border-line px-1.5">
+                  <WishlistButton
+                    isWishlisted={!!app.isWishlisted}
+                    onToggle={() => toggleWishlist(app)}
+                  />
+                  <IconButton
+                    label={t('pipeline.deleteAria', { title: app.job.title })}
+                    tone="danger"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setToDelete(app);
+                    }}
+                  >
+                    <Trash2 size={18} strokeWidth={1.75} />
+                  </IconButton>
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
 
-      <Dialog open={!!toDelete} onClose={() => !deleting && setToDelete(null)} maxWidth="xs" fullWidth>
-        <DialogTitle>{t('pipeline.deleteTitle')}</DialogTitle>
-        <DialogContent>
-          <Typography variant="body2">
-            {toDelete?.job.companyName
-              ? t('pipeline.deleteConfirm', {
-                  title: toDelete.job.title,
-                  company: toDelete.job.companyName,
-                })
-              : t('pipeline.deleteConfirmNoCompany', { title: toDelete?.job.title || '' })}
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setToDelete(null)} disabled={deleting}>{t('common.cancel')}</Button>
-          <Button variant="contained" color="error" onClick={confirmDelete} disabled={deleting}>
-            {deleting ? <CircularProgress size={16} /> : t('common.delete')}
-          </Button>
-        </DialogActions>
+      <Dialog
+        open={!!toDelete}
+        onClose={() => !deleting && setToDelete(null)}
+        title={t('pipeline.deleteTitle')}
+        actions={
+          <>
+            <DialogCancelButton onClick={() => setToDelete(null)} disabled={deleting}>
+              {t('common.cancel')}
+            </DialogCancelButton>
+            <Button variant="danger" onClick={confirmDelete} disabled={deleting}>
+              {deleting ? <LoaderCircle size={16} className="animate-spin" /> : t('common.delete')}
+            </Button>
+          </>
+        }
+      >
+        {toDelete?.job.companyName
+          ? t('pipeline.deleteConfirm', {
+              title: toDelete.job.title,
+              company: toDelete.job.companyName,
+            })
+          : t('pipeline.deleteConfirmNoCompany', { title: toDelete?.job.title || '' })}
       </Dialog>
-    </Box>
+    </div>
   );
 }

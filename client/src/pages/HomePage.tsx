@@ -1,22 +1,28 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Box,
-  Card,
-  CardActionArea,
-  CardContent,
-  Typography,
-  Skeleton,
-  Button,
-  Chip,
-} from '@mui/material';
-import AddCircleOutlineIcon from '@mui/icons-material/AddCircleOutline';
-import EventAvailableIcon from '@mui/icons-material/EventAvailable';
-import ScheduleIcon from '@mui/icons-material/Schedule';
+  ArrowRight,
+  BriefcaseBusiness,
+  CalendarClock,
+  CircleAlert,
+  Handshake,
+  MessagesSquare,
+  Plus,
+} from 'lucide-react';
 import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
 import type { DashboardAttentionReason, DashboardData } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import {
+  Card,
+  CardButton,
+  CardHeader,
+  EmptyState,
+  FilterChip,
+  PageHeader,
+  Skeleton,
+  StatCard,
+} from '../ui';
 
 function attentionLabel(
   t: (key: string, params?: Record<string, string | number>) => string,
@@ -43,12 +49,16 @@ export default function HomePage() {
 
   if (loading) {
     return (
-      <Box>
-        <Skeleton variant="rounded" height={80} sx={{ mb: 2 }} />
-        <Skeleton variant="rounded" height={100} sx={{ mb: 2 }} />
-        <Skeleton variant="rounded" height={160} sx={{ mb: 2 }} />
-        <Skeleton variant="rounded" height={160} />
-      </Box>
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-20" />
+        <div className="grid grid-cols-2 gap-3">
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+          <Skeleton className="h-32" />
+        </div>
+        <Skeleton className="h-48" />
+      </div>
     );
   }
 
@@ -58,205 +68,187 @@ export default function HomePage() {
   const recentApplications = data?.recentApplications ?? [];
 
   const overviewItems = [
-    { key: 'active', value: pipeline?.active ?? 0, color: 'text.primary' as const },
-    { key: 'needsAttention', value: needsAttention.length, color: 'warning.main' as const },
-    { key: 'interviews', value: pipeline?.interviews ?? 0, color: 'success.main' as const },
-    { key: 'offers', value: pipeline?.offers ?? 0, color: 'success.main' as const },
+    {
+      key: 'active',
+      value: pipeline?.active ?? 0,
+      icon: <BriefcaseBusiness size={18} strokeWidth={1.75} />,
+      iconClassName: 'bg-brand-soft text-brand',
+    },
+    {
+      key: 'needsAttention',
+      value: needsAttention.length,
+      icon: <CircleAlert size={18} strokeWidth={1.75} />,
+      iconClassName: 'bg-warning-soft text-warning',
+    },
+    {
+      key: 'interviews',
+      value: pipeline?.interviews ?? 0,
+      icon: <MessagesSquare size={18} strokeWidth={1.75} />,
+      iconClassName: 'bg-success-soft text-success',
+    },
+    {
+      key: 'offers',
+      value: pipeline?.offers ?? 0,
+      icon: <Handshake size={18} strokeWidth={1.75} />,
+      iconClassName: 'bg-info-soft text-info',
+    },
   ];
 
   const pipelineChips = [
-    { key: 'inProgress', count: pipeline?.inProgress ?? 0, color: 'default' as const },
-    { key: 'readyForReview', count: pipeline?.readyForReview ?? 0, color: 'warning' as const },
-    { key: 'readyToSend', count: pipeline?.readyToSend ?? 0, color: 'secondary' as const },
-    { key: 'sent', count: pipeline?.sent ?? 0, color: 'primary' as const },
+    { key: 'inProgress', count: pipeline?.inProgress ?? 0 },
+    { key: 'readyForReview', count: pipeline?.readyForReview ?? 0 },
+    { key: 'readyToSend', count: pipeline?.readyToSend ?? 0 },
+    { key: 'sent', count: pipeline?.sent ?? 0 },
   ];
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-      <Card sx={{ bgcolor: 'primary.main', color: 'white' }}>
-        <CardActionArea onClick={() => navigate('/new')} sx={{ p: 0 }}>
-          <CardContent sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 3 }}>
-            <AddCircleOutlineIcon sx={{ fontSize: 40 }} />
-            <Box>
-              <Typography variant="h6" fontWeight={700}>{t('home.newJobPosting')}</Typography>
-              <Typography variant="body2" sx={{ opacity: 0.8 }}>{t('home.newJobPostingHint')}</Typography>
-            </Box>
-          </CardContent>
-        </CardActionArea>
-      </Card>
+    <div className="flex flex-col gap-4 lg:gap-6">
+      <PageHeader title={t('home.title')} subtitle={t('home.subtitle')} />
 
-      <Card>
-        <CardContent>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            {t('home.overview')}
-          </Typography>
-          <Box
-            sx={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(4, 1fr)',
-              gap: 1,
-              mt: 0.5,
-              mb: 2,
-            }}
-          >
-            {overviewItems.map((item) => (
-              <Box
-                key={item.key}
-                component="button"
-                type="button"
-                onClick={() => navigate('/pipeline')}
-                sx={{
-                  border: 0,
-                  bgcolor: 'transparent',
-                  p: 1,
-                  borderRadius: 1,
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  '&:hover': { bgcolor: 'action.hover' },
-                }}
-              >
-                <Typography variant="h5" fontWeight={700} color={item.color}>
-                  {item.value}
-                </Typography>
-                <Typography variant="caption" color="text.secondary">
-                  {t(`home.overviewStats.${item.key}`)}
-                </Typography>
-              </Box>
-            ))}
-          </Box>
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-            {pipelineChips.map((chip) => (
-              <Chip
-                key={chip.key}
-                size="small"
-                label={t(`home.${chip.key}`, { count: chip.count })}
-                color={chip.color}
-                variant="outlined"
-                onClick={() => navigate('/pipeline')}
-              />
-            ))}
-          </Box>
-        </CardContent>
-      </Card>
+      <CardButton
+        onClick={() => navigate('/new')}
+        className="bg-gradient-to-br from-brand to-brand-hover text-white border-transparent shadow-[0_10px_24px_rgb(255_87_34_/_0.28)] sm:hidden"
+      >
+        <div className="flex items-center gap-3">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-[14px] bg-white/15">
+            <Plus size={22} strokeWidth={2.25} />
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="text-[15px] font-bold">{t('home.newJobPosting')}</div>
+            <div className="text-sm text-white/85">{t('home.newJobPostingHint')}</div>
+          </div>
+          <ArrowRight size={18} className="opacity-90" />
+        </div>
+      </CardButton>
 
-      <Card>
-        <CardContent sx={{ pb: needsAttention.length ? 1 : undefined }}>
-          <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-            {t('home.needsAttention')}
-          </Typography>
-          {needsAttention.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              {t('home.noAttention')}
-            </Typography>
-          ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-              {needsAttention.map((item) => (
-                <Card key={`${item._id}-${item.reason}`} variant="outlined">
-                  <CardActionArea onClick={() => navigate(`/applications/${item._id}`)}>
-                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'flex-start' }}>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="subtitle2" fontWeight={600} noWrap>
-                            {item.title}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" noWrap>
-                            {item.companyName}
-                          </Typography>
-                          <Typography variant="caption" color="warning.main" sx={{ mt: 0.5, display: 'block' }}>
-                            {attentionLabel(t, item.reason, item.unansweredQuestions)}
-                          </Typography>
-                        </Box>
-                        <StatusBadge status={item.status} />
-                      </Box>
-                    </CardContent>
-                  </CardActionArea>
-                </Card>
-              ))}
-            </Box>
-          )}
-        </CardContent>
-      </Card>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {overviewItems.map((item) => (
+          <StatCard
+            key={item.key}
+            icon={item.icon}
+            iconClassName={item.iconClassName}
+            value={item.value}
+            label={t(`home.overviewStats.${item.key}`)}
+            onClick={() => navigate('/pipeline')}
+          />
+        ))}
+      </div>
 
-      {upcoming.length > 0 && (
+      <div className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {pipelineChips.map((chip) => (
+          <FilterChip key={chip.key} onClick={() => navigate('/pipeline')}>
+            {t(`home.${chip.key}`, { count: chip.count })}
+          </FilterChip>
+        ))}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
         <Card>
-          <CardContent sx={{ pb: 1 }}>
-            <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-              {t('home.upcoming')}
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
-              {upcoming.map((item) => (
-                <Card key={`${item.type}-${item._id}-${item.at}`} variant="outlined">
-                  <CardActionArea onClick={() => navigate(`/applications/${item._id}`)}>
-                    <CardContent sx={{ py: 1.5, display: 'flex', gap: 1.5, alignItems: 'center', '&:last-child': { pb: 1.5 } }}>
-                      {item.type === 'interview' ? (
-                        <EventAvailableIcon color="success" fontSize="small" />
-                      ) : (
-                        <ScheduleIcon color="warning" fontSize="small" />
-                      )}
-                      <Box sx={{ minWidth: 0, flex: 1 }}>
-                        <Typography variant="subtitle2" fontWeight={600} noWrap>
-                          {item.title}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" noWrap>
-                          {item.companyName}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {item.type === 'interview'
-                            ? t('home.upcomingInterview', { date: formatDateTime(item.at) })
-                            : t('home.upcomingDeadline', { date: formatDate(item.at) })}
-                        </Typography>
-                      </Box>
-                    </CardContent>
-                  </CardActionArea>
-                </Card>
+          <CardHeader title={t('home.needsAttention')} />
+          {needsAttention.length === 0 ? (
+            <p className="text-sm text-ink-secondary">{t('home.noAttention')}</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {needsAttention.map((item) => (
+                <CardButton
+                  key={`${item._id}-${item.reason}`}
+                  padding="sm"
+                  onClick={() => navigate(`/applications/${item._id}`)}
+                  className="border-line shadow-none"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-semibold text-ink">{item.title}</div>
+                      <div className="truncate text-sm text-ink-secondary">{item.companyName}</div>
+                      <div className="mt-1 text-xs font-semibold text-warning">
+                        {attentionLabel(t, item.reason, item.unansweredQuestions)}
+                      </div>
+                    </div>
+                    <StatusBadge status={item.status} />
+                  </div>
+                </CardButton>
               ))}
-            </Box>
-          </CardContent>
+            </div>
+          )}
         </Card>
-      )}
+
+        {upcoming.length > 0 && (
+          <Card>
+            <CardHeader title={t('home.upcoming')} />
+            <div className="flex flex-col gap-2">
+              {upcoming.map((item) => (
+                <CardButton
+                  key={`${item.type}-${item._id}-${item.at}`}
+                  padding="sm"
+                  onClick={() => navigate(`/applications/${item._id}`)}
+                  className="border-line shadow-none"
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={
+                        item.type === 'interview'
+                          ? 'inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-success-soft text-success'
+                          : 'inline-flex h-9 w-9 items-center justify-center rounded-[12px] bg-warning-soft text-warning'
+                      }
+                    >
+                      <CalendarClock size={16} strokeWidth={1.75} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-semibold text-ink">{item.title}</div>
+                      <div className="truncate text-sm text-ink-secondary">{item.companyName}</div>
+                      <div className="mt-0.5 text-xs text-ink-muted">
+                        {item.type === 'interview'
+                          ? t('home.upcomingInterview', { date: formatDateTime(item.at) })
+                          : t('home.upcomingDeadline', { date: formatDate(item.at) })}
+                      </div>
+                    </div>
+                  </div>
+                </CardButton>
+              ))}
+            </div>
+          </Card>
+        )}
+      </div>
 
       <Card>
-        <CardContent sx={{ pb: recentApplications.length ? 1 : undefined }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
-            <Typography variant="subtitle2" color="text.secondary">
-              {t('home.recentApplications')}
-            </Typography>
-            <Button size="small" onClick={() => navigate('/pipeline')}>
+        <CardHeader
+          title={t('home.recentApplications')}
+          action={
+            <button
+              type="button"
+              onClick={() => navigate('/pipeline')}
+              className="text-sm font-semibold text-brand hover:text-brand-hover"
+            >
               {t('home.seeFullPipeline')}
-            </Button>
-          </Box>
-          {recentApplications.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              {t('home.noApplications')}
-            </Typography>
-          ) : (
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {recentApplications.map((app) => (
-                <Card key={app._id} variant="outlined">
-                  <CardActionArea onClick={() => navigate(`/applications/${app._id}`)}>
-                    <CardContent sx={{ py: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1, alignItems: 'flex-start' }}>
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography variant="subtitle2" fontWeight={600} noWrap>
-                            {app.title}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" noWrap>
-                            {app.companyName}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {t('home.updatedAt', { date: formatDate(app.updatedAt) })}
-                          </Typography>
-                        </Box>
-                        <StatusBadge status={app.status} />
-                      </Box>
-                    </CardContent>
-                  </CardActionArea>
-                </Card>
-              ))}
-            </Box>
-          )}
-        </CardContent>
+            </button>
+          }
+        />
+        {recentApplications.length === 0 ? (
+          <EmptyState>{t('home.noApplications')}</EmptyState>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {recentApplications.map((app) => (
+              <CardButton
+                key={app._id}
+                padding="sm"
+                onClick={() => navigate(`/applications/${app._id}`)}
+                className="border-line shadow-none"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold text-ink">{app.title}</div>
+                    <div className="truncate text-sm text-ink-secondary">{app.companyName}</div>
+                    <div className="mt-0.5 text-xs text-ink-muted">
+                      {t('home.updatedAt', { date: formatDate(app.updatedAt) })}
+                    </div>
+                  </div>
+                  <StatusBadge status={app.status} />
+                </div>
+              </CardButton>
+            ))}
+          </div>
+        )}
       </Card>
-    </Box>
+    </div>
   );
 }

@@ -1,64 +1,45 @@
-import { ToggleButton, ToggleButtonGroup } from '@mui/material';
 import { useLocale, type AppLocale } from '../../i18n';
+import { cn } from '../../ui';
 
 interface Props {
-  /** `onDark` for AppBar; `onLight` for login/setup pages */
-  variant?: 'onDark' | 'onLight';
+  variant?: 'default' | 'onDark';
 }
 
-export default function LanguageSwitcher({ variant = 'onDark' }: Props) {
+export default function LanguageSwitcher({ variant = 'default' }: Props) {
   const { locale, setLocale, t } = useLocale();
   const onDark = variant === 'onDark';
 
   return (
-    <ToggleButtonGroup
-      exclusive
-      size="small"
-      value={locale}
-      onChange={(_, value: AppLocale | null) => {
-        if (value) setLocale(value);
-      }}
+    <div
+      role="group"
       aria-label={t('language.switchAria')}
-      sx={
-        onDark
-          ? {
-              bgcolor: 'rgba(255,255,255,0.12)',
-              '& .MuiToggleButton-root': {
-                color: 'rgba(255,255,255,0.85)',
-                borderColor: 'rgba(255,255,255,0.25)',
-                px: 1.25,
-                py: 0.25,
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: 0.4,
-                '&.Mui-selected': {
-                  color: 'primary.main',
-                  bgcolor: 'common.white',
-                  '&:hover': { bgcolor: 'grey.100' },
-                },
-              },
-            }
-          : {
-              bgcolor: 'action.hover',
-              '& .MuiToggleButton-root': {
-                color: 'text.secondary',
-                borderColor: 'divider',
-                px: 1.25,
-                py: 0.25,
-                fontSize: 12,
-                fontWeight: 700,
-                letterSpacing: 0.4,
-                '&.Mui-selected': {
-                  color: 'primary.contrastText',
-                  bgcolor: 'primary.main',
-                  '&:hover': { bgcolor: 'primary.dark' },
-                },
-              },
-            }
-      }
+      className={cn(
+        'inline-flex rounded-full p-0.5',
+        onDark ? 'bg-white/15' : 'bg-canvas border border-line'
+      )}
     >
-      <ToggleButton value="da">DA</ToggleButton>
-      <ToggleButton value="en">EN</ToggleButton>
-    </ToggleButtonGroup>
+      {(['da', 'en'] as AppLocale[]).map((code) => {
+        const selected = locale === code;
+        return (
+          <button
+            key={code}
+            type="button"
+            onClick={() => setLocale(code)}
+            className={cn(
+              'h-8 min-w-10 rounded-full px-2.5 text-xs font-bold tracking-wide transition-colors',
+              selected
+                ? onDark
+                  ? 'bg-white text-brand'
+                  : 'bg-brand text-white'
+                : onDark
+                  ? 'text-white/80 hover:text-white'
+                  : 'text-ink-secondary hover:text-ink'
+            )}
+          >
+            {code.toUpperCase()}
+          </button>
+        );
+      })}
+    </div>
   );
 }

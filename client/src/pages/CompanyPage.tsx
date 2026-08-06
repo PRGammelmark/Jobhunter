@@ -32,6 +32,7 @@ import WishlistButton from '../components/pipeline/WishlistButton';
 import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import type { Application, Company } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import { PageHeader } from '../ui';
 
 type CompanyForm = {
   name: string;
@@ -198,27 +199,29 @@ export default function CompanyPage() {
           { label: company.name },
         ]}
       />
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 1 }}>
-        <Typography variant="h5" fontWeight={700}>{company.name}</Typography>
-        {!editing && (
-          <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
-            <Button startIcon={<EditIcon />} onClick={() => setEditing(true)}>
-              {t('company.edit')}
-            </Button>
-            <Button
-              color="error"
-              startIcon={<DeleteOutlineIcon />}
-              onClick={() => {
-                setDeleteError(null);
-                setDeleteDialog(true);
-              }}
-              title={t('company.deleteTitle')}
-            >
-              {t('company.delete')}
-            </Button>
-          </Box>
-        )}
-      </Box>
+      <PageHeader
+        title={company.name}
+        action={
+          !editing ? (
+            <Box sx={{ display: 'flex', gap: 1, flexShrink: 0 }}>
+              <Button startIcon={<EditIcon />} onClick={() => setEditing(true)}>
+                {t('company.edit')}
+              </Button>
+              <Button
+                color="error"
+                startIcon={<DeleteOutlineIcon />}
+                onClick={() => {
+                  setDeleteError(null);
+                  setDeleteDialog(true);
+                }}
+                title={t('company.deleteTitle')}
+              >
+                {t('company.delete')}
+              </Button>
+            </Box>
+          ) : undefined
+        }
+      />
 
       {saved && <Alert severity="success">{t('company.saved')}</Alert>}
 

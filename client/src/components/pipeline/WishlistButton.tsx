@@ -1,7 +1,6 @@
-import { IconButton } from '@mui/material';
-import FavoriteIcon from '@mui/icons-material/Favorite';
-import FavoriteBorderIcon from '@mui/icons-material/FavoriteBorder';
+import { Star } from 'lucide-react';
 import { useLocale } from '../../i18n';
+import { IconButton, cn } from '../../ui';
 
 interface Props {
   isWishlisted: boolean;
@@ -12,26 +11,25 @@ interface Props {
 export default function WishlistButton({ isWishlisted, onToggle, size = 'small' }: Props) {
   const { t } = useLocale();
   const interactive = !!onToggle;
+  const iconSize = size === 'small' ? 18 : 20;
 
   return (
     <IconButton
-      size={size}
-      aria-label={isWishlisted ? t('wishlist.remove') : t('wishlist.add')}
+      label={isWishlisted ? t('wishlist.remove') : t('wishlist.add')}
       aria-pressed={isWishlisted}
+      disabled={!interactive}
       onClick={(e) => {
         e.stopPropagation();
         e.preventDefault();
         onToggle?.(!isWishlisted);
       }}
-      disabled={!interactive}
-      sx={{
-        color: isWishlisted ? 'secondary.main' : 'action.active',
-        '&.Mui-disabled': {
-          color: isWishlisted ? 'secondary.main' : 'action.disabled',
-        },
-      }}
+      className={cn(isWishlisted ? 'text-brand' : 'text-ink-muted')}
     >
-      {isWishlisted ? <FavoriteIcon fontSize={size} /> : <FavoriteBorderIcon fontSize={size} />}
+      <Star
+        size={iconSize}
+        strokeWidth={1.75}
+        fill={isWishlisted ? 'currentColor' : 'none'}
+      />
     </IconButton>
   );
 }

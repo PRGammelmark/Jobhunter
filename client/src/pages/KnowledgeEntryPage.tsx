@@ -22,6 +22,7 @@ import { api } from '../services/api';
 import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import { normalizeSkillConfidence, type EmploymentDetails, type KnowledgeEntry, type KnowledgeEntryType } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import { PageHeader } from '../ui';
 
 const ENTRY_TYPES: KnowledgeEntryType[] = [
   'employment',
@@ -176,7 +177,7 @@ export default function KnowledgeEntryPage() {
           ...(crumbTitle ? [{ label: crumbTitle }] : []),
         ]}
       />
-      <Typography variant="h5" fontWeight={700}>{isNew ? t('knowledgeEntry.newTitle') : entry.title}</Typography>
+      <PageHeader title={isNew ? t('knowledgeEntry.newTitle') : entry.title} />
 
       <FormControl fullWidth>
         <InputLabel>{t('knowledgeEntry.type')}</InputLabel>

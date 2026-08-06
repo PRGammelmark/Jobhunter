@@ -1,7 +1,7 @@
-import { Breadcrumbs, Link, Typography } from '@mui/material';
-import NavigateNextIcon from '@mui/icons-material/NavigateNext';
+import { ChevronRight } from 'lucide-react';
 import { Link as RouterLink } from 'react-router-dom';
 import { useLocale } from '../../i18n';
+import { cn } from '../../ui';
 
 export type Crumb = {
   label: string;
@@ -18,47 +18,29 @@ export default function PageBreadcrumbs({ items }: Props) {
   if (crumbs.length === 0) return null;
 
   return (
-    <Breadcrumbs
-      separator={<NavigateNextIcon fontSize="small" sx={{ color: 'text.disabled' }} />}
-      aria-label={t('breadcrumbs.aria')}
-      sx={{
-        mb: 0.5,
-        minWidth: 0,
-        '& .MuiBreadcrumbs-ol': { flexWrap: 'wrap', rowGap: 0.25 },
-        '& .MuiBreadcrumbs-li': { minWidth: 0, display: 'flex' },
-      }}
-    >
-      {crumbs.map((item, index) => {
-        const isLast = index === crumbs.length - 1;
-        if (isLast || !item.to) {
+    <nav aria-label={t('breadcrumbs.aria')} className="mb-2 min-w-0">
+      <ol className="flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-ink-secondary">
+        {crumbs.map((item, index) => {
+          const isLast = index === crumbs.length - 1;
           return (
-            <Typography
-              key={`${item.label}-${index}`}
-              variant="body2"
-              color="text.secondary"
-              noWrap
-              sx={{ maxWidth: { xs: 160, sm: 240 } }}
-            >
-              {item.label}
-            </Typography>
+            <li key={`${item.label}-${index}`} className="inline-flex min-w-0 items-center gap-1">
+              {index > 0 && <ChevronRight size={14} className="shrink-0 text-ink-muted" />}
+              {isLast || !item.to ? (
+                <span className="truncate max-w-[160px] sm:max-w-[240px]">{item.label}</span>
+              ) : (
+                <RouterLink
+                  to={item.to}
+                  className={cn(
+                    'truncate max-w-[140px] sm:max-w-[200px] hover:text-brand transition-colors'
+                  )}
+                >
+                  {item.label}
+                </RouterLink>
+              )}
+            </li>
           );
-        }
-
-        return (
-          <Link
-            key={`${item.label}-${index}`}
-            component={RouterLink}
-            to={item.to}
-            underline="hover"
-            color="text.secondary"
-            variant="body2"
-            noWrap
-            sx={{ maxWidth: { xs: 140, sm: 200 } }}
-          >
-            {item.label}
-          </Link>
-        );
-      })}
-    </Breadcrumbs>
+        })}
+      </ol>
+    </nav>
   );
 }

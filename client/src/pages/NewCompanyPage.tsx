@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Box,
-  Typography,
   TextField,
   Button,
   Alert,
@@ -14,6 +13,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { api } from '../services/api';
 import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import { useLocale } from '../i18n';
+import { PageHeader } from '../ui';
 
 type CompanyForm = {
   name: string;
@@ -117,10 +117,7 @@ export default function NewCompanyPage() {
           { label: t('newCompany.title') },
         ]}
       />
-      <Typography variant="h5" fontWeight={700}>{t('newCompany.title')}</Typography>
-      <Typography variant="body2" color="text.secondary">
-        {t('newCompany.subtitle')}
-      </Typography>
+      <PageHeader title={t('newCompany.title')} subtitle={t('newCompany.subtitle')} />
 
       <Card>
         <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>

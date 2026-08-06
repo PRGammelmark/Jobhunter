@@ -17,6 +17,7 @@ import type { PlatformUser } from '@career-intelligence/shared';
 import { api } from '../services/api';
 import { useAuth } from '../auth/AuthContext';
 import { useLocale } from '../i18n';
+import { PageHeader } from '../ui';
 
 export default function PlatformUsersPage() {
   const { user } = useAuth();
@@ -71,17 +72,15 @@ export default function PlatformUsersPage() {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h5" fontWeight={700}>
-          {t('platformUsers.title')}
-        </Typography>
-        <Button variant="contained" onClick={() => setOpen(true)}>
-          {t('platformUsers.addUser')}
-        </Button>
-      </Box>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        {t('platformUsers.subtitle')}
-      </Typography>
+      <PageHeader
+        title={t('platformUsers.title')}
+        subtitle={t('platformUsers.subtitle')}
+        action={
+          <Button variant="contained" onClick={() => setOpen(true)}>
+            {t('platformUsers.addUser')}
+          </Button>
+        }
+      />
       {error && (
         <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
           {error}

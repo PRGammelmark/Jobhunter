@@ -1,17 +1,17 @@
-import { useState } from 'react';
-import { Chip, Menu, MenuItem } from '@mui/material';
-import ArrowDropDownIcon from '@mui/icons-material/ArrowDropDown';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { APPLICATION_STATUSES, type ApplicationStatus } from '@career-intelligence/shared';
 import { useLocale } from '../../i18n';
+import { Badge, type BadgeTone, cn } from '../../ui';
 
-const STATUS_COLORS: Record<ApplicationStatus, 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'error' | 'info'> = {
-  not_started: 'default',
+const STATUS_TONES: Record<ApplicationStatus, BadgeTone> = {
+  not_started: 'neutral',
   in_progress: 'info',
   ready_for_review: 'warning',
-  ready_to_send: 'secondary',
-  sent: 'primary',
+  ready_to_send: 'brand',
+  sent: 'brand',
   interview: 'success',
-  rejected: 'error',
+  rejected: 'danger',
   offer: 'success',
   hired: 'success',
 };
@@ -23,42 +23,65 @@ interface Props {
 
 export default function StatusBadge({ status, onChange }: Props) {
   const { t } = useLocale();
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
   const selectable = !!onChange;
 
+  useEffect(() => {
+    if (!open) return;
+    const onPointer = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onPointer);
+    return () => document.removeEventListener('mousedown', onPointer);
+  }, [open]);
+
   return (
-    <>
-      <Chip
-        label={t(`status.${status}`)}
-        color={STATUS_COLORS[status]}
-        size="small"
-        onClick={selectable ? (e) => setAnchorEl(e.currentTarget) : undefined}
-        onDelete={selectable ? (e) => setAnchorEl(e.currentTarget) : undefined}
-        deleteIcon={selectable ? <ArrowDropDownIcon /> : undefined}
-        sx={{ fontWeight: 500, cursor: selectable ? 'pointer' : undefined }}
-      />
-      {selectable && (
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={() => setAnchorEl(null)}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-          transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+    <div ref={rootRef} className="relative inline-flex">
+      <button
+        type="button"
+        disabled={!selectable}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (selectable) setOpen((v) => !v);
+        }}
+        className={cn(
+          'inline-flex items-center',
+          selectable ? 'cursor-pointer' : 'cursor-default'
+        )}
+      >
+        <Badge tone={STATUS_TONES[status]} className={cn(selectable && 'pr-1.5')}>
+          {t(`status.${status}`)}
+          {selectable && <ChevronDown size={14} className="ml-0.5 opacity-80" />}
+        </Badge>
+      </button>
+      {selectable && open && (
+        <div
+          role="menu"
+          className="absolute right-0 top-full z-30 mt-1.5 min-w-[180px] overflow-hidden rounded-[14px] border border-line bg-surface py-1 shadow-soft"
+          onClick={(e) => e.stopPropagation()}
         >
           {APPLICATION_STATUSES.map((s) => (
-            <MenuItem
+            <button
               key={s}
-              selected={s === status}
+              type="button"
+              role="menuitem"
+              className={cn(
+                'flex w-full px-3 py-2.5 text-left text-sm transition-colors hover:bg-canvas',
+                s === status ? 'font-semibold text-brand' : 'text-ink'
+              )}
               onClick={() => {
-                setAnchorEl(null);
-                if (s !== status) onChange(s);
+                setOpen(false);
+                if (s !== status) onChange?.(s);
               }}
             >
               {t(`status.${s}`)}
-            </MenuItem>
+            </button>
           ))}
-        </Menu>
+        </div>
       )}
-    </>
+    </div>
   );
 }

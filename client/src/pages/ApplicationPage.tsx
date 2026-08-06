@@ -44,6 +44,7 @@ import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
 import WishlistButton from '../components/pipeline/WishlistButton';
 import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
+import { PageHeader } from '../ui';
 import {
   type Application,
   type ApplicationStatus,
@@ -409,22 +410,23 @@ export default function ApplicationPage() {
           { label: app.job.title },
         ]}
       />
-      <Box sx={{ mb: 2, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 1 }}>
-        <Box>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-            <StatusBadge status={app.status} onChange={changeStatus} />
-            <WishlistButton isWishlisted={!!app.isWishlisted} onToggle={toggleWishlist} />
-          </Box>
-          <Typography variant="h5" fontWeight={700} sx={{ mt: 1 }}>{app.job.title}</Typography>
-        </Box>
-        <IconButton
-          size="small"
-          aria-label={t('application.actions.moreAria')}
-          onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
-          disabled={!!actionLoading || deleting}
-        >
-          <MoreVertIcon />
-        </IconButton>
+      <PageHeader
+        title={app.job.title}
+        subtitle={displayCompanyName || undefined}
+        action={
+          <IconButton
+            size="small"
+            aria-label={t('application.actions.moreAria')}
+            onClick={(e) => setMoreMenuAnchor(e.currentTarget)}
+            disabled={!!actionLoading || deleting}
+          >
+            <MoreVertIcon />
+          </IconButton>
+        }
+      />
+      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+        <StatusBadge status={app.status} onChange={changeStatus} />
+        <WishlistButton isWishlisted={!!app.isWishlisted} onToggle={toggleWishlist} />
         <Menu
           anchorEl={moreMenuAnchor}
           open={Boolean(moreMenuAnchor)}
