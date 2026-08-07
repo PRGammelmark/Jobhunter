@@ -40,6 +40,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { FormattedJobText } from '../components/FormattedJobText';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
 import WishlistButton from '../components/pipeline/WishlistButton';
@@ -149,7 +150,7 @@ export default function ApplicationPage() {
       setApp(result.application);
       setDocuments(await api.getDocuments(app._id));
       setGenerateDialog(false);
-      setTab(3);
+      setTab(1);
     } finally {
       setActionLoading('');
     }
@@ -424,9 +425,26 @@ export default function ApplicationPage() {
           </IconButton>
         }
       />
-      <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-        <StatusBadge status={app.status} onChange={changeStatus} />
-        <WishlistButton isWishlisted={!!app.isWishlisted} onToggle={toggleWishlist} />
+      <Box
+        sx={{
+          mb: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: { xs: 'space-between', lg: 'flex-start' },
+          gap: 0.5,
+          width: '100%',
+        }}
+      >
+        <StatusBadge
+          status={app.status}
+          onChange={changeStatus}
+          size="medium"
+        />
+        <WishlistButton
+          isWishlisted={!!app.isWishlisted}
+          onToggle={toggleWishlist}
+          size="medium"
+        />
         <Menu
           anchorEl={moreMenuAnchor}
           open={Boolean(moreMenuAnchor)}
@@ -461,16 +479,16 @@ export default function ApplicationPage() {
             {hasAnalysis ? t('application.actions.updateAnalysis') : t('application.actions.analyze')}
           </Button>
         )}
-        {hasApplication ? (
+        {hasApplication && tab !== 1 ? (
           <Button
             variant="outlined"
             size="small"
-            onClick={() => setTab(3)}
+            onClick={() => setTab(1)}
             disabled={!!actionLoading}
           >
             {t('application.actions.viewApplication')}
           </Button>
-        ) : showGenerateButton ? (
+        ) : !hasApplication && showGenerateButton ? (
           <Button
             variant="outlined"
             size="small"
@@ -514,8 +532,6 @@ export default function ApplicationPage() {
         sx={{ mb: 2, maxWidth: '100%', minWidth: 0 }}
       >
         <Tab label={t('application.tabs.job')} />
-        <Tab label={t('application.tabs.company')} />
-        <Tab label={t('application.tabs.analysis')} />
         <Tab
           label={
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -534,6 +550,8 @@ export default function ApplicationPage() {
             </Box>
           }
         />
+        <Tab label={t('application.tabs.analysis')} />
+        <Tab label={t('application.tabs.company')} />
         <Tab label={t('application.tabs.interview')} />
         <Tab label={t('application.tabs.notes')} />
       </Tabs>
@@ -556,12 +574,36 @@ export default function ApplicationPage() {
           ) : null}
           <Card>
             <CardContent>
-              {app.job.location && <Typography variant="body2" color="text.secondary">📍 {app.job.location}</Typography>}
-              {app.job.url && (
-                <Typography variant="body2" sx={{ mt: 1 }}>
-                  <a href={app.job.url} target="_blank" rel="noreferrer">{t('application.job.openOriginal')}</a>
-                </Typography>
-              )}
+              <Box
+                sx={{
+                  display: 'flex',
+                  alignItems: 'flex-start',
+                  justifyContent: 'space-between',
+                  gap: 1.5,
+                  flexWrap: 'wrap',
+                }}
+              >
+                {app.job.location ? (
+                  <Typography variant="body2" color="text.secondary" sx={{ pt: 0.5 }}>
+                    📍 {app.job.location}
+                  </Typography>
+                ) : (
+                  <Box />
+                )}
+                {app.job.url && (
+                  <Button
+                    variant="contained"
+                    size="small"
+                    href={app.job.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    endIcon={<OpenInNewIcon />}
+                    sx={{ ml: 'auto', flexShrink: 0 }}
+                  >
+                    {t('application.job.openOriginal')}
+                  </Button>
+                )}
+              </Box>
               <Divider sx={{ my: 2 }} />
               <FormattedJobText text={app.job.rawText || app.job.summary || ''} />
             </CardContent>
@@ -569,7 +611,7 @@ export default function ApplicationPage() {
         </Box>
       )}
 
-      {tab === 1 && (
+      {tab === 3 && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {!company ? (
             <Alert severity="info">{t('application.company.noneLinked')}</Alert>
@@ -711,7 +753,7 @@ export default function ApplicationPage() {
         </Box>
       )}
 
-      {tab === 3 && (
+      {tab === 1 && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           {documents.length === 0 ? (
             <Alert severity="info">

@@ -207,7 +207,7 @@ export const da = {
     job: {
       matchAssessment: 'Match-vurdering',
       matchAssessmentPending: 'Match-vurdering kommer, når AI-analysen er kørt.',
-      openOriginal: 'Åbn original opslag',
+      openOriginal: 'Åbn originalt opslag',
     },
     company: {
       noneLinked: 'Ingen virksomhed knyttet til dette stillingsopslag.',
@@ -663,6 +663,10 @@ export const da = {
     androidManual: 'Åbn browserens menu (⋮), og vælg «Installer app» eller «Føj til startskærm».',
     portraitTitle: 'Drej telefonen',
     portraitBody: 'ApplyPilot understøtter kun portrættilstand. Vend din enhed lodret for at fortsætte.',
+    updateTitle: 'Ny version klar',
+    updateBody: 'Der er en opdatering til ApplyPilot. Genindlæs for at få den nyeste version.',
+    updateCta: 'Opdater',
+    updateLater: 'Senere',
   },
 } as const;
 

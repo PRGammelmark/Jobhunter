@@ -11,7 +11,7 @@ interface Props {
 export default function WishlistButton({ isWishlisted, onToggle, size = 'small' }: Props) {
   const { t } = useLocale();
   const interactive = !!onToggle;
-  const iconSize = size === 'small' ? 18 : 20;
+  const iconSize = size === 'small' ? 18 : 24;
 
   return (
     <IconButton

@@ -665,5 +665,9 @@ export const en: Messages = {
     androidManual: 'Open the browser menu (⋮) and choose “Install app” or “Add to Home screen”.',
     portraitTitle: 'Rotate your phone',
     portraitBody: 'ApplyPilot only supports portrait mode. Turn your device upright to continue.',
+    updateTitle: 'New version ready',
+    updateBody: 'An update is available for ApplyPilot. Reload to get the latest version.',
+    updateCta: 'Update',
+    updateLater: 'Later',
   },
 };

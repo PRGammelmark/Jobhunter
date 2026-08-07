@@ -19,13 +19,15 @@ const STATUS_TONES: Record<ApplicationStatus, BadgeTone> = {
 interface Props {
   status: ApplicationStatus;
   onChange?: (status: ApplicationStatus) => void;
+  size?: 'small' | 'medium';
 }
 
-export default function StatusBadge({ status, onChange }: Props) {
+export default function StatusBadge({ status, onChange, size = 'small' }: Props) {
   const { t } = useLocale();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const selectable = !!onChange;
+  const medium = size === 'medium';
 
   useEffect(() => {
     if (!open) return;
@@ -52,9 +54,17 @@ export default function StatusBadge({ status, onChange }: Props) {
           selectable ? 'cursor-pointer' : 'cursor-default'
         )}
       >
-        <Badge tone={STATUS_TONES[status]} className={cn(selectable && 'pr-1.5')}>
+        <Badge
+          tone={STATUS_TONES[status]}
+          className={cn(
+            selectable && (medium ? 'pr-2' : 'pr-1.5'),
+            medium && 'px-3 py-1.5 text-sm'
+          )}
+        >
           {t(`status.${status}`)}
-          {selectable && <ChevronDown size={14} className="ml-0.5 opacity-80" />}
+          {selectable && (
+            <ChevronDown size={medium ? 16 : 14} className="ml-0.5 opacity-80" />
+          )}
         </Badge>
       </button>
       {selectable && open && (
