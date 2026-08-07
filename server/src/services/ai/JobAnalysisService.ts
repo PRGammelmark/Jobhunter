@@ -25,7 +25,7 @@ Returnér JSON med denne struktur:
   "matchAssessment": "string — ca. 100 ord"
 }
 
-matchAssessment: Skriv en kort, kvalitativ vurdering på dansk (ca. 80–120 ord) af, hvor godt stillingen matcher kandidatens ønsker, kompetencer og profil. Vær ærlig og konkret: nævn både match og evt. mangler/misforhold. Brug Om mig og Knowledge Base aktivt. Skriv i prosa — ikke bullet points.
+matchAssessment: Skriv en kort, kvalitativ vurdering på dansk (ca. 80–120 ord) af, hvor godt stillingen matcher mine ønsker, kompetencer og profil. Skriv i førsteperson ("jeg"/"mig") — aldrig i tredjeperson om "kandidaten", "brugeren" eller lignende. Vær ærlig og konkret: nævn både match og evt. mangler/misforhold. Brug Om mig og Knowledge Base aktivt. Skriv i prosa — ikke bullet points.
 
 Respektér confidence (1–5, kun på skills): fremhæv IKKE skills med confidence 1–2 uden at spørge brugeren.
 Stil spørgsmål i stedet for at gætte.`;
@@ -122,7 +122,7 @@ export class JobAnalysisService {
       `VIRKSOMHED: ${companyName}`,
       'JOBTEKST (kun det primære opslag — ignorér eventuelle øvrige listings/navigation hvis de sniger sig ind):',
       jobText.slice(0, 6000),
-      'OM MIG (fri tekst om kandidaten — brug som kontekst for personlighed, motivation og styrker):',
+      'OM MIG (fri tekst om mig — brug som kontekst for personlighed, motivation og styrker):',
       aboutMe || '(ikke udfyldt)',
       'KNOWLEDGE BASE:',
       kbContext,

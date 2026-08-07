@@ -78,7 +78,7 @@ export const da = {
     interviews: '{{count}} samtaler',
     offers: '{{count}} tilbud',
     needsAttention: 'Næste skridt',
-    noAttention: 'Intet der kræver din handling lige nu',
+    noAttention: 'Tilføj flere stillingsopslag',
     upcoming: 'Kommende',
     upcomingInterview: 'Samtale · {{date}}',
     upcomingDeadline: 'Deadline · {{date}}',

@@ -80,7 +80,7 @@ export const en: Messages = {
     interviews: '{{count}} interviews',
     offers: '{{count}} offers',
     needsAttention: 'Next steps',
-    noAttention: 'Nothing needs your attention right now',
+    noAttention: 'Add more job postings',
     upcoming: 'Upcoming',
     upcomingInterview: 'Interview · {{date}}',
     upcomingDeadline: 'Deadline · {{date}}',
