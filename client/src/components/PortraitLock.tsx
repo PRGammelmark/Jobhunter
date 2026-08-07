@@ -4,8 +4,13 @@ import { useLocale } from '../i18n';
 
 const LANDSCAPE_QUERY = '(orientation: landscape) and (max-height: 560px)';
 
+/** Not in all TS DOM libs; present in Chromium / installed PWAs. */
+type OrientationWithLock = ScreenOrientation & {
+  lock?: (orientation: string) => Promise<void>;
+};
+
 function tryLockPortrait() {
-  const orientation = window.screen?.orientation;
+  const orientation = window.screen?.orientation as OrientationWithLock | undefined;
   if (!orientation || typeof orientation.lock !== 'function') return;
   void orientation.lock('portrait').catch(() => {
     /* Browsers only allow this in installed PWAs / fullscreen — ignore failures. */
