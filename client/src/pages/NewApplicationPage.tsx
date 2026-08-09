@@ -1,34 +1,33 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LoaderCircle } from 'lucide-react';
-import { api } from '../services/api';
 import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import { useLocale } from '../i18n';
+import { useCreateApplication } from '../queries';
 import { Alert, Button, Card, Field, FilterChip, Input, PageHeader, Textarea } from '../ui';
 
 export default function NewApplicationPage() {
   const navigate = useNavigate();
   const { t } = useLocale();
+  const createApplication = useCreateApplication();
   const [tab, setTab] = useState(0);
   const [url, setUrl] = useState('');
   const [manualText, setManualText] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [title, setTitle] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const loading = createApplication.isPending;
+
   const handleSubmit = async () => {
-    setLoading(true);
     setError('');
     try {
-      const app = await api.createApplication(
+      const app = await createApplication.mutateAsync(
         tab === 0 ? { url } : { manualText, companyName, title }
       );
       navigate(`/applications/${app._id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('newApplication.createError'));
-    } finally {
-      setLoading(false);
     }
   };
 

@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import App from './App';
 import { AuthProvider } from './auth/AuthContext';
+import { QueryProvider } from './queries';
 import { LocaleProvider } from './i18n';
 import PwaInstallPrompt from './components/PwaInstallPrompt';
 import PwaUpdatePrompt from './components/PwaUpdatePrompt';
@@ -17,12 +18,14 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       <CssBaseline />
       <BrowserRouter>
         <AuthProvider>
-          <LocaleProvider>
-            <App />
-            <PwaInstallPrompt />
-            <PwaUpdatePrompt />
-            <PortraitLock />
-          </LocaleProvider>
+          <QueryProvider>
+            <LocaleProvider>
+              <App />
+              <PwaInstallPrompt />
+              <PwaUpdatePrompt />
+              <PortraitLock />
+            </LocaleProvider>
+          </QueryProvider>
         </AuthProvider>
       </BrowserRouter>
     </ThemeProvider>

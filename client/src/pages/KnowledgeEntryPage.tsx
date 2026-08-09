@@ -24,10 +24,16 @@ import {
 } from '@mui/material';
 import CheckIcon from '@mui/icons-material/Check';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
-import { api } from '../services/api';
 import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import { normalizeSkillConfidence, type EmploymentDetails, type KnowledgeEntry, type KnowledgeEntryType } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import {
+  useCreateKnowledge,
+  useDeleteKnowledge,
+  useKnowledge,
+  useKnowledgeEntry,
+  useUpdateKnowledge,
+} from '../queries';
 import { PageHeader } from '../ui';
 
 const ENTRY_TYPES: KnowledgeEntryType[] = [
@@ -78,19 +84,25 @@ export default function KnowledgeEntryPage() {
   const [searchParams] = useSearchParams();
   const isNew = id === 'new';
 
+  const { data: allEntries = [] } = useKnowledge();
+  const { data: loadedEntry } = useKnowledgeEntry(isNew ? undefined : id);
+  const createKnowledge = useCreateKnowledge();
+  const updateKnowledge = useUpdateKnowledge();
+  const deleteKnowledge = useDeleteKnowledge();
+
   const [entry, setEntry] = useState<Partial<KnowledgeEntry>>(() =>
     createEmptyEntry(parseEntryType(searchParams.get('type')))
   );
-  const [allEntries, setAllEntries] = useState<KnowledgeEntry[]>([]);
   const [keywordInput, setKeywordInput] = useState('');
   const [responsibilityInput, setResponsibilityInput] = useState('');
-  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(Boolean((location.state as { justSaved?: boolean } | null)?.justSaved));
   const [deleteDialog, setDeleteDialog] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const requestedType = searchParams.get('type');
+  const saving = createKnowledge.isPending || updateKnowledge.isPending;
+  const deleting = deleteKnowledge.isPending;
+
   const buildEmploymentTitle = (employment?: EmploymentDetails): string => {
     if (!employment?.role && !employment?.company) return '';
     if (employment.role && employment.company) {
@@ -99,17 +111,19 @@ export default function KnowledgeEntryPage() {
         company: employment.company,
       });
     }
-    return employment.role || employment.company;
+    return employment.role || employment.company || '';
   };
 
   useEffect(() => {
-    api.getKnowledge().then(setAllEntries);
-    if (!isNew && id) {
-      api.getKnowledgeEntry(id).then(setEntry);
-    } else if (isNew) {
+    if (isNew) {
       setEntry(createEmptyEntry(parseEntryType(requestedType)));
     }
   }, [id, isNew, requestedType]);
+
+  useEffect(() => {
+    if (isNew || !loadedEntry) return;
+    setEntry((prev) => (prev._id === loadedEntry._id ? prev : loadedEntry));
+  }, [isNew, loadedEntry]);
 
   useEffect(() => {
     if (!saved) return;
@@ -141,32 +155,28 @@ export default function KnowledgeEntryPage() {
       delete payload.confidenceLabel;
     }
 
-    setSaving(true);
     setSaved(false);
     try {
       if (isNew) {
-        const created = await api.createKnowledge(payload);
+        const created = await createKnowledge.mutateAsync(payload);
         navigate(`/knowledge/${created._id}`, { replace: true, state: { justSaved: true } });
       } else if (id) {
-        await api.updateKnowledge(id, payload);
+        await updateKnowledge.mutateAsync({ id, data: payload });
         setSaved(true);
       }
-    } finally {
-      setSaving(false);
+    } catch {
+      // stay on form
     }
   };
 
   const confirmDelete = async () => {
     if (!id || isNew) return;
-    setDeleting(true);
     setDeleteError(null);
     try {
-      await api.deleteKnowledge(id);
+      await deleteKnowledge.mutateAsync(id);
       navigate('/knowledge');
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : t('knowledgeEntry.deleteDialog.error'));
-    } finally {
-      setDeleting(false);
     }
   };
 

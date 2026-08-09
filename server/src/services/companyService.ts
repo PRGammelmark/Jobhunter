@@ -8,6 +8,17 @@ export function normalizeCompanyName(name: string): string {
     .replace(/[^a-z0-9æøåäöü\s-]/gi, '');
 }
 
+/** Normalize to 8 digits, or undefined if not a valid CVR. */
+export function normalizeCvr(cvr?: string | null): string | undefined {
+  if (!cvr) return undefined;
+  const digits = String(cvr).replace(/\D/g, '');
+  return /^\d{8}$/.test(digits) ? digits : undefined;
+}
+
+function escapeRegex(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export type CompanyCreateFields = {
   cvr?: string;
   description?: string;
@@ -26,22 +37,33 @@ export async function findOrCreateCompany(companyName: string, options: CompanyC
   const { tenantId, ...extra } = options;
   const { Company } = await import('../models');
   const normalizedName = normalizeCompanyName(companyName);
+  const cvr = normalizeCvr(extra.cvr);
 
   if (!normalizedName) {
     return null;
   }
 
-  let company = await Company.findOne({
-    tenantId,
-    $or: [{ normalizedName }, { name: { $regex: new RegExp(`^${companyName.trim()}$`, 'i') } }],
-  });
+  // Prefer CVR match so the same legal entity is reused even when names differ.
+  let company = cvr ? await Company.findOne({ tenantId, cvr }) : null;
 
   if (!company) {
+    company = await Company.findOne({
+      tenantId,
+      $or: [
+        { normalizedName },
+        { name: { $regex: new RegExp(`^${escapeRegex(companyName.trim())}$`, 'i') } },
+      ],
+    });
+  }
+
+  if (!company) {
+    const { cvr: _rawCvr, ...fields } = extra;
     company = await Company.create({
       tenantId,
       name: companyName.trim(),
       normalizedName,
-      ...extra,
+      ...fields,
+      ...(cvr ? { cvr } : {}),
       memory: {
         salaryNotes: [],
         contacts: [],
@@ -55,7 +77,8 @@ export async function findOrCreateCompany(companyName: string, options: CompanyC
     });
   } else {
     company.lastActivityAt = new Date();
-    if (extra?.cvr) company.cvr = extra.cvr;
+    // Fill missing CVR; never overwrite an existing different CVR.
+    if (cvr && !company.cvr) company.cvr = cvr;
     if (extra?.description) company.description = extra.description;
     if (extra?.website) company.website = extra.website;
     if (extra?.linkedIn) company.linkedIn = extra.linkedIn;

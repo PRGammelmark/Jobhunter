@@ -5,6 +5,7 @@ import { requireAuth } from '../middleware/auth';
 import { scrapeJobUrl, parseManualJobText } from '../services/scraper/jobScraper';
 import { isWeakCompanyName } from '../services/scraper/companyNameResolver';
 import { findOrCreateCompany, touchCompany } from '../services/companyService';
+import { fetchCvrData } from '../services/cvr/cvrService';
 import { jobAnalysisService } from '../services/ai/JobAnalysisService';
 import { jobExtractionService } from '../services/ai/JobExtractionService';
 import { coverLetterGenerator } from '../services/ai/CoverLetterGenerator';
@@ -103,9 +104,19 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Angiv url eller manualText' });
     }
 
-    const company = !isWeakCompanyName(jobData.companyName)
-      ? await findOrCreateCompany(jobData.companyName, { tenantId })
-      : null;
+    let company = null;
+    if (!isWeakCompanyName(jobData.companyName)) {
+      // Best-effort CVR resolve so we can reuse an existing company by CVR
+      // even when the posting uses a slightly different company name.
+      let cvr: string | undefined;
+      try {
+        const cvrData = await fetchCvrData(jobData.companyName);
+        cvr = cvrData?.cvr;
+      } catch {
+        // CVR lookup is optional — continue with name match only
+      }
+      company = await findOrCreateCompany(jobData.companyName, { tenantId, cvr });
+    }
 
     const application = await Application.create({
       tenantId,

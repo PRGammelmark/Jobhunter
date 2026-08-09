@@ -8,8 +8,10 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
 import { useAuth } from '../auth/AuthContext';
+import { keys } from '../queries/keys';
 import { da } from './messages/da';
 import { en } from './messages/en';
 import { translate, type TranslateParams } from './translate';
@@ -19,6 +21,7 @@ import {
   LOCALE_STORAGE_KEY,
   type AppLocale,
 } from './types';
+import type { Settings } from '@career-intelligence/shared';
 
 const MESSAGES = { da, en } as const;
 
@@ -44,6 +47,7 @@ const LocaleContext = createContext<LocaleContextValue | null>(null);
 
 export function LocaleProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [locale, setLocaleState] = useState<AppLocale>(() => readStoredLocale());
   const userPickedRef = useRef(false);
 
@@ -56,8 +60,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     }
     if (!syncSettings || !user) return;
     try {
-      const settings = await api.getSettings();
-      await api.updateSettings({
+      const settings = await queryClient.fetchQuery({
+        queryKey: keys.settings,
+        queryFn: () => api.getSettings(),
+      });
+      const updated = await api.updateSettings({
         ...settings,
         preferences: {
           ...settings.preferences,
@@ -65,10 +72,11 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
           aiModel: settings.preferences?.aiModel || 'gpt-4o-mini',
         },
       });
+      queryClient.setQueryData<Settings>(keys.settings, updated);
     } catch {
       /* ignore — UI language still updates locally */
     }
-  }, [user]);
+  }, [user, queryClient]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -83,7 +91,10 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
           await persistLocale(readStoredLocale(), true);
           return;
         }
-        const settings = await api.getSettings();
+        const settings = await queryClient.fetchQuery({
+          queryKey: keys.settings,
+          queryFn: () => api.getSettings(),
+        });
         const fromSettings = settings.preferences?.defaultLanguage;
         if (!cancelled && isAppLocale(fromSettings)) {
           setLocaleState(fromSettings);
@@ -100,7 +111,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [user?._id, persistLocale]);
+  }, [user?._id, persistLocale, queryClient]);
 
   const setLocale = useCallback(
     (next: AppLocale) => {

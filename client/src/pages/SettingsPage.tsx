@@ -32,6 +32,12 @@ import {
   type Settings,
 } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import {
+  useDisconnectEmail,
+  useEmailStatus,
+  useSettings,
+  useUpdateSettings,
+} from '../queries';
 
 function aiModelMenuItems(): ReactNode[] {
   const items: ReactNode[] = [];
@@ -53,36 +59,41 @@ function aiModelMenuItems(): ReactNode[] {
 export default function SettingsPage() {
   const { locale, setLocale, t } = useLocale();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [settings, setSettings] = useState<Settings | null>(null);
+  const { data: loadedSettings } = useSettings();
+  const { data: emailStatus, refetch: refetchEmailStatus } = useEmailStatus();
+  const updateSettings = useUpdateSettings();
+  const disconnectEmail = useDisconnectEmail();
+
+  const [draft, setDraft] = useState<Settings | null>(null);
   const [coverLetterPrompt, setCoverLetterPrompt] = useState(() => getDefaultCoverLetterPrompt(locale));
-  const [emailStatus, setEmailStatus] = useState<{ connected: boolean; provider: string | null; connectedEmail?: string } | null>(null);
   const [saved, setSaved] = useState(false);
   const [notice, setNotice] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  const load = async () => {
-    const [s, e] = await Promise.all([api.getSettings(), api.getEmailStatus()]);
-    setSettings(s);
-    const raw = s.coverLetterPrompt?.trim();
+  useEffect(() => {
+    if (!loadedSettings || draft) return;
+    setDraft(loadedSettings);
+    const raw = loadedSettings.coverLetterPrompt?.trim();
     setCoverLetterPrompt(
       raw ? normalizeCoverLetterPrompt(raw) : getDefaultCoverLetterPrompt(locale)
     );
-    setEmailStatus(e);
-  };
+  }, [loadedSettings, draft, locale]);
 
   useEffect(() => {
-    load();
     const connected = searchParams.get('emailConnected');
     const error = searchParams.get('emailError');
     if (connected) {
-      setNotice({ type: 'success', text: t('settings.emailConnected', { provider: connected === 'gmail' ? 'Gmail' : 'Outlook' }) });
+      setNotice({
+        type: 'success',
+        text: t('settings.emailConnected', { provider: connected === 'gmail' ? 'Gmail' : 'Outlook' }),
+      });
       setSearchParams({});
-      load();
+      void refetchEmailStatus();
     }
     if (error) {
       setNotice({ type: 'error', text: error });
       setSearchParams({});
     }
-  }, []);
+  }, [searchParams, setSearchParams, t, refetchEmailStatus]);
 
   useEffect(() => {
     const otherLocale: AppLanguage = locale === 'da' ? 'en' : 'da';
@@ -92,17 +103,17 @@ export default function SettingsPage() {
   }, [locale, coverLetterPrompt]);
 
   const save = async () => {
-    if (!settings) return;
+    if (!draft) return;
     const sanitized = sanitizeCoverLetterPrompt(coverLetterPrompt);
-    const updated = await api.updateSettings({
-      ...settings,
+    const updated = await updateSettings.mutateAsync({
+      ...draft,
       coverLetterPrompt: sanitized || '',
       preferences: {
-        ...settings.preferences,
+        ...draft.preferences,
         defaultLanguage: locale,
       },
     });
-    setSettings(updated);
+    setDraft(updated);
     setCoverLetterPrompt(
       updated.coverLetterPrompt?.trim()
         ? normalizeCoverLetterPrompt(updated.coverLetterPrompt)
@@ -113,8 +124,7 @@ export default function SettingsPage() {
   };
 
   const disconnect = async () => {
-    await api.disconnectEmail();
-    await load();
+    await disconnectEmail.mutateAsync();
     setNotice({ type: 'success', text: t('settings.emailDisconnected') });
   };
 
@@ -122,10 +132,10 @@ export default function SettingsPage() {
     setCoverLetterPrompt(getDefaultCoverLetterPrompt(locale));
   };
 
-  if (!settings) return null;
+  if (!draft) return null;
 
-  const selectedAiModel = isAiModelId(settings.preferences?.aiModel || '')
-    ? settings.preferences.aiModel
+  const selectedAiModel = isAiModelId(draft.preferences?.aiModel || '')
+    ? draft.preferences.aiModel
     : DEFAULT_AI_MODEL;
 
   const promptCustomized = coverLetterPrompt !== getDefaultCoverLetterPrompt(locale);
@@ -148,10 +158,10 @@ export default function SettingsPage() {
               onChange={(e) => {
                 const nextLocale = e.target.value as AppLanguage;
                 setLocale(nextLocale);
-                setSettings({
-                  ...settings,
+                setDraft({
+                  ...draft,
                   preferences: {
-                    ...settings.preferences,
+                    ...draft.preferences,
                     defaultLanguage: nextLocale,
                   },
                 });
@@ -168,10 +178,10 @@ export default function SettingsPage() {
       <Card>
         <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
           <Typography variant="subtitle1" fontWeight={600}>{t('settings.profile')}</Typography>
-          <TextField label={t('settings.name')} fullWidth value={settings.profile.name} onChange={(e) => setSettings({ ...settings, profile: { ...settings.profile, name: e.target.value } })} />
-          <TextField label={t('settings.email')} fullWidth value={settings.profile.email} onChange={(e) => setSettings({ ...settings, profile: { ...settings.profile, email: e.target.value } })} />
-          <TextField label={t('settings.phone')} fullWidth value={settings.profile.phone || ''} onChange={(e) => setSettings({ ...settings, profile: { ...settings.profile, phone: e.target.value } })} />
-          <TextField label={t('settings.linkedIn')} fullWidth value={settings.profile.linkedIn || ''} onChange={(e) => setSettings({ ...settings, profile: { ...settings.profile, linkedIn: e.target.value } })} />
+          <TextField label={t('settings.name')} fullWidth value={draft.profile.name} onChange={(e) => setDraft({ ...draft, profile: { ...draft.profile, name: e.target.value } })} />
+          <TextField label={t('settings.email')} fullWidth value={draft.profile.email} onChange={(e) => setDraft({ ...draft, profile: { ...draft.profile, email: e.target.value } })} />
+          <TextField label={t('settings.phone')} fullWidth value={draft.profile.phone || ''} onChange={(e) => setDraft({ ...draft, profile: { ...draft.profile, phone: e.target.value } })} />
+          <TextField label={t('settings.linkedIn')} fullWidth value={draft.profile.linkedIn || ''} onChange={(e) => setDraft({ ...draft, profile: { ...draft.profile, linkedIn: e.target.value } })} />
         </CardContent>
       </Card>
 
@@ -194,11 +204,11 @@ export default function SettingsPage() {
               label={t('settings.aiModel')}
               value={selectedAiModel}
               onChange={(e) =>
-                setSettings({
-                  ...settings,
+                setDraft({
+                  ...draft,
                   preferences: {
-                    ...settings.preferences,
-                    defaultLanguage: settings.preferences?.defaultLanguage || 'da',
+                    ...draft.preferences,
+                    defaultLanguage: draft.preferences?.defaultLanguage || 'da',
                     aiModel: e.target.value,
                   },
                 })
@@ -271,7 +281,9 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Button variant="contained" size="large" onClick={save}>{t('settings.save')}</Button>
+      <Button variant="contained" size="large" onClick={save} disabled={updateSettings.isPending}>
+        {t('settings.save')}
+      </Button>
     </Box>
   );
 }

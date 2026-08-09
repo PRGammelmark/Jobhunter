@@ -16,7 +16,6 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
-import { api } from '../services/api';
 import {
   ABOUT_ME_MAX_WORDS,
   countWords,
@@ -25,6 +24,7 @@ import {
   type KnowledgeEntryType,
 } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import { useKnowledge, useSettings, useUpdateSettings } from '../queries';
 import { PageHeader } from '../ui';
 
 const TYPE_ORDER: KnowledgeEntryType[] = [
@@ -100,17 +100,16 @@ function EntryCard({ entry, onOpen }: { entry: KnowledgeEntry; onOpen: () => voi
 
 function AboutMeSection({
   value,
-  onSaved,
 }: {
   value: string;
-  onSaved: (next: string) => void;
 }) {
   const { t } = useLocale();
+  const updateSettings = useUpdateSettings();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value);
-  const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const saving = updateSettings.isPending;
 
   useEffect(() => {
     if (!editing) setDraft(value);
@@ -130,17 +129,13 @@ function AboutMeSection({
       setError(t('knowledge.aboutMe.maxWords', { max: ABOUT_ME_MAX_WORDS }));
       return;
     }
-    setSaving(true);
     setError('');
     try {
-      await api.updateSettings({ aboutMe: draft });
-      onSaved(draft);
+      await updateSettings.mutateAsync({ aboutMe: draft });
       setEditing(false);
       setSaved(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('knowledge.aboutMe.errorSave'));
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -222,27 +217,20 @@ function AboutMeSection({
 export default function KnowledgePage() {
   const navigate = useNavigate();
   const { t } = useLocale();
-  const [entries, setEntries] = useState<KnowledgeEntry[]>([]);
-  const [aboutMe, setAboutMe] = useState('');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    Promise.all([api.getKnowledge(), api.getSettings()])
-      .then(([knowledge, settings]) => {
-        setEntries(knowledge);
-        setAboutMe(settings.aboutMe || '');
-      })
-      .finally(() => setLoading(false));
-  }, []);
+  const { data: entries, isPending: knowledgePending } = useKnowledge();
+  const { data: settings, isPending: settingsPending } = useSettings();
+  const aboutMe = settings?.aboutMe || '';
+  const loading = (knowledgePending && !entries) || (settingsPending && !settings);
+  const entryList = entries ?? [];
 
   const grouped = useMemo(
     () =>
       TYPE_ORDER.map((type) => ({
         type,
         label: t(`knowledge.types.${type}`),
-        entries: entries.filter((e) => e.type === type),
+        entries: entryList.filter((e) => e.type === type),
       })),
-    [entries, t]
+    [entryList, t]
   );
 
   return (
@@ -253,7 +241,7 @@ export default function KnowledgePage() {
         [1, 2, 3].map((i) => <Skeleton key={i} variant="rounded" height={80} sx={{ mb: 1 }} />)
       ) : (
         <>
-          <AboutMeSection value={aboutMe} onSaved={setAboutMe} />
+          <AboutMeSection value={aboutMe} />
 
           {grouped.map((group) => (
             <Box key={group.type} sx={{ mb: 3.5 }}>

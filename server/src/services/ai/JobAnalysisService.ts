@@ -22,10 +22,10 @@ Returnér JSON med denne struktur:
   "aiQuestions": [{ "question": "string", "context": "string" }],
   "suggestedTweaks": ["string"],
   "recommendation": "use_existing" | "minor_tweaks" | "generate_new",
-  "matchAssessment": "string — ca. 100 ord"
+  "matchAssessment": "string — max 50 ord"
 }
 
-matchAssessment: Skriv en kort, kvalitativ vurdering på dansk (ca. 80–120 ord) af, hvor godt stillingen matcher mine ønsker, kompetencer og profil. Skriv i førsteperson ("jeg"/"mig") — aldrig i tredjeperson om "kandidaten", "brugeren" eller lignende. Vær ærlig og konkret: nævn både match og evt. mangler/misforhold. Brug Om mig og Knowledge Base aktivt. Skriv i prosa — ikke bullet points.
+matchAssessment: Ultra-kort kvalitativ vurdering på dansk (max 40–50 ord, gerne 2–3 sætninger) af, hvor godt stillingen matcher mine ønsker, kompetencer og profil. Skriv i førsteperson ("jeg"/"mig") — aldrig i tredjeperson om "kandidaten", "brugeren" eller lignende. Vær ærlig og konkret: nævn både match og evt. mangler/misforhold. Brug Om mig og Knowledge Base aktivt. Skriv i prosa — ikke bullet points. Ingen uddybning eller gentagelser.
 
 Respektér confidence (1–5, kun på skills): fremhæv IKKE skills med confidence 1–2 uden at spørge brugeren.
 Stil spørgsmål i stedet for at gætte.`;

@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import {
   ChartColumn,
   Clock3,
@@ -7,21 +6,15 @@ import {
   Send,
   ThumbsDown,
 } from 'lucide-react';
-import { api } from '../services/api';
-import type { Statistics } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import { useStatistics } from '../queries';
 import { Card, CardHeader, PageHeader, Skeleton, StatCard } from '../ui';
 
 export default function StatisticsPage() {
   const { t } = useLocale();
-  const [stats, setStats] = useState<Statistics | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: stats, isPending } = useStatistics();
 
-  useEffect(() => {
-    api.getStatistics().then(setStats).finally(() => setLoading(false));
-  }, []);
-
-  if (loading) return <Skeleton className="h-80" />;
+  if (isPending && stats == null) return <Skeleton className="h-80" />;
 
   const items = [
     {

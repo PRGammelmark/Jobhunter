@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BriefcaseBusiness,
@@ -7,10 +6,10 @@ import {
   Handshake,
   MessagesSquare,
 } from 'lucide-react';
-import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
-import type { DashboardAttentionReason, DashboardData } from '@career-intelligence/shared';
+import type { DashboardAttentionReason } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import { useDashboard } from '../queries';
 import {
   Card,
   CardButton,
@@ -38,14 +37,9 @@ function attentionLabel(
 export default function HomePage() {
   const navigate = useNavigate();
   const { t, formatDate, formatDateTime } = useLocale();
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, isPending } = useDashboard();
 
-  useEffect(() => {
-    api.getDashboard().then(setData).finally(() => setLoading(false));
-  }, []);
-
-  if (loading) {
+  if (isPending && !data) {
     return (
       <div className="flex flex-col gap-3">
         <Skeleton className="h-20" />

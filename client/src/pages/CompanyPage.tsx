@@ -26,12 +26,20 @@ import {
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
 import WishlistButton from '../components/pipeline/WishlistButton';
 import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
-import type { Application, Company } from '@career-intelligence/shared';
+import type { Company } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import {
+  useAddCompanyNote,
+  useCompany,
+  useCompanyApplications,
+  useDeleteCompany,
+  useDeleteCompanyNote,
+  useResearchCompany,
+  useUpdateCompany,
+} from '../queries';
 import { PageHeader } from '../ui';
 
 type CompanyForm = {
@@ -72,47 +80,45 @@ export default function CompanyPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t, formatDate } = useLocale();
-  const [company, setCompany] = useState<Company | null>(null);
-  const [applications, setApplications] = useState<Application[]>([]);
+  const { data: company, isPending: companyPending } = useCompany(id);
+  const { data: applications = [] } = useCompanyApplications(id);
+  const updateCompany = useUpdateCompany();
+  const researchCompany = useResearchCompany();
+  const addCompanyNote = useAddCompanyNote();
+  const deleteCompanyNote = useDeleteCompanyNote();
+  const deleteCompany = useDeleteCompany();
+
   const [form, setForm] = useState<CompanyForm | null>(null);
-  const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [researching, setResearching] = useState(false);
   const [saved, setSaved] = useState(false);
   const [researchError, setResearchError] = useState<string | null>(null);
   const [researchSources, setResearchSources] = useState<string[] | null>(null);
   const [noteInput, setNoteInput] = useState('');
-  const [addingNote, setAddingNote] = useState(false);
   const [removingNoteIndex, setRemovingNoteIndex] = useState<number | null>(null);
   const [deleteDialog, setDeleteDialog] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (id) {
-      Promise.all([api.getCompany(id), api.getCompanyApplications(id)])
-        .then(([c, apps]) => {
-          setCompany(c);
-          setForm(toForm(c));
-          setApplications(apps);
-        })
-        .finally(() => setLoading(false));
+    if (company && !editing) {
+      setForm(toForm(company));
     }
-  }, [id]);
+  }, [company, editing]);
+
+  const saving = updateCompany.isPending;
+  const researching = researchCompany.isPending;
+  const addingNote = addCompanyNote.isPending;
+  const deleting = deleteCompany.isPending;
 
   const save = async () => {
     if (!id || !form) return;
-    setSaving(true);
     try {
-      const updated = await api.updateCompany(id, form);
-      setCompany(updated);
+      const updated = await updateCompany.mutateAsync({ id, data: form });
       setForm(toForm(updated));
       setEditing(false);
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
-    } finally {
-      setSaving(false);
+    } catch {
+      // keep editing
     }
   };
 
@@ -132,32 +138,30 @@ export default function CompanyPage() {
       return;
     }
 
-    setResearching(true);
     setResearchError(null);
     setResearchSources(null);
     try {
-      const result = await api.researchCompany(id, {
-        name: searchName || undefined,
-        cvr: searchCvr || undefined,
+      const result = await researchCompany.mutateAsync({
+        id,
+        data: {
+          name: searchName || undefined,
+          cvr: searchCvr || undefined,
+        },
       });
       setForm(mergeResearch(form, result));
       if (result.sources?.length) setResearchSources(result.sources);
     } catch (err) {
       setResearchError(err instanceof Error ? err.message : t('company.researchErrorGeneric'));
-    } finally {
-      setResearching(false);
     }
   };
 
   const addNote = async () => {
     if (!id || !noteInput.trim()) return;
-    setAddingNote(true);
     try {
-      const updated = await api.addCompanyNote(id, noteInput.trim());
-      setCompany(updated);
+      await addCompanyNote.mutateAsync({ id, text: noteInput.trim() });
       setNoteInput('');
-    } finally {
-      setAddingNote(false);
+    } catch {
+      // keep input
     }
   };
 
@@ -165,8 +169,7 @@ export default function CompanyPage() {
     if (!id) return;
     setRemovingNoteIndex(noteIndex);
     try {
-      const updated = await api.deleteCompanyNote(id, noteIndex);
-      setCompany(updated);
+      await deleteCompanyNote.mutateAsync({ id, noteIndex });
     } finally {
       setRemovingNoteIndex(null);
     }
@@ -174,19 +177,16 @@ export default function CompanyPage() {
 
   const confirmDelete = async () => {
     if (!id) return;
-    setDeleting(true);
     setDeleteError(null);
     try {
-      await api.deleteCompany(id);
+      await deleteCompany.mutateAsync(id);
       navigate('/companies');
     } catch (err) {
       setDeleteError(err instanceof Error ? err.message : t('company.deleteDialog.error'));
-    } finally {
-      setDeleting(false);
     }
   };
 
-  if (loading) return <Skeleton variant="rounded" height={300} />;
+  if (companyPending && !company) return <Skeleton variant="rounded" height={300} />;
   if (!company || !form) return <Typography>{t('company.notFound')}</Typography>;
 
   const linkedJobCount = applications.length;

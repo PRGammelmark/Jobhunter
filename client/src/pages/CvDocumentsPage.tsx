@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import {
   Box,
   Typography,
@@ -36,6 +36,16 @@ import type {
   KnowledgeEntryDraft,
 } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import {
+  useConfirmCvKnowledgeExtraction,
+  useCreateCvTemplate,
+  useCreateCvTemplateManual,
+  useCreateRecommendation,
+  useCvTemplates,
+  useDeleteCvTemplate,
+  useDeleteRecommendation,
+  useRecommendations,
+} from '../queries';
 import { PageHeader } from '../ui';
 import {
   TemplateList,
@@ -51,53 +61,49 @@ type DeleteTarget =
 
 export default function CvDocumentsPage() {
   const { t } = useLocale();
+  const { data: cvTemplatesData, isPending: cvPending } = useCvTemplates();
+  const { data: recommendationsData, isPending: recPending } = useRecommendations();
+  const cvTemplates = cvTemplatesData ?? [];
+  const recommendations = recommendationsData ?? [];
+  const loading = (cvPending && !cvTemplatesData) || (recPending && !recommendationsData);
+
+  const createCv = useCreateCvTemplate();
+  const createCvManual = useCreateCvTemplateManual();
+  const createRecommendation = useCreateRecommendation();
+  const deleteCv = useDeleteCvTemplate();
+  const deleteRecommendation = useDeleteRecommendation();
+  const confirmExtract = useConfirmCvKnowledgeExtraction();
+
   const [tab, setTab] = useState(0);
-  const [cvTemplates, setCvTemplates] = useState<CvTemplate[]>([]);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [loading, setLoading] = useState(true);
   const [viewer, setViewer] = useState<ViewableDocument | null>(null);
   const [toDelete, setToDelete] = useState<DeleteTarget | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualForm, setManualForm] = useState({ name: '', content: '' });
-  const [saving, setSaving] = useState(false);
   const [extractOpen, setExtractOpen] = useState(false);
   const [extracting, setExtracting] = useState(false);
   const [extractResult, setExtractResult] = useState<CvKnowledgeExtractionResult | null>(null);
   const [selectedIndexes, setSelectedIndexes] = useState<Set<number>>(new Set());
-  const [savingExtract, setSavingExtract] = useState(false);
   const [extractError, setExtractError] = useState<string | null>(null);
   const [extractSuccess, setExtractSuccess] = useState<string | null>(null);
   const cvFileRef = useRef<HTMLInputElement>(null);
   const recFileRef = useRef<HTMLInputElement>(null);
 
-  const load = async () => {
-    const [cvs, recs] = await Promise.all([
-      api.getCvTemplates(),
-      api.getRecommendations(),
-    ]);
-    setCvTemplates(cvs);
-    setRecommendations(recs);
-  };
-
-  useEffect(() => {
-    load().finally(() => setLoading(false));
-  }, []);
+  const saving = createCvManual.isPending;
+  const deleting = deleteCv.isPending || deleteRecommendation.isPending;
+  const savingExtract = confirmExtract.isPending;
 
   const uploadCv = async (file: File) => {
     const form = new FormData();
     form.append('file', file);
     form.append('name', file.name.replace(/\.[^.]+$/, ''));
-    await api.createCvTemplate(form);
-    load();
+    await createCv.mutateAsync(form);
   };
 
   const uploadRecommendation = async (file: File) => {
     const form = new FormData();
     form.append('file', file);
     form.append('name', file.name.replace(/\.[^.]+$/, ''));
-    await api.createRecommendation(form);
-    load();
+    await createRecommendation.mutateAsync(form);
   };
 
   const openManual = () => {
@@ -107,30 +113,26 @@ export default function CvDocumentsPage() {
 
   const saveManual = async () => {
     if (!manualForm.name.trim() || !manualForm.content.trim()) return;
-    setSaving(true);
     try {
-      await api.createCvTemplateManual({ name: manualForm.name, rawText: manualForm.content });
+      await createCvManual.mutateAsync({ name: manualForm.name, rawText: manualForm.content });
       setManualOpen(false);
-      load();
-    } finally {
-      setSaving(false);
+    } catch {
+      // keep dialog open
     }
   };
 
   const confirmDelete = async () => {
     if (!toDelete) return;
-    setDeleting(true);
     try {
       if (toDelete.type === 'cv') {
-        await api.deleteCvTemplate(toDelete.item._id);
+        await deleteCv.mutateAsync(toDelete.item._id);
       } else {
-        await api.deleteRecommendation(toDelete.item._id);
+        await deleteRecommendation.mutateAsync(toDelete.item._id);
       }
       if (viewer?._id === toDelete.item._id) setViewer(null);
       setToDelete(null);
-      load();
-    } finally {
-      setDeleting(false);
+    } catch {
+      // keep dialog open
     }
   };
 
@@ -182,10 +184,9 @@ export default function CvDocumentsPage() {
     );
     if (selected.length === 0) return;
 
-    setSavingExtract(true);
     setExtractError(null);
     try {
-      const result = await api.confirmCvKnowledgeExtraction(selected);
+      const result = await confirmExtract.mutateAsync(selected);
       setExtractSuccess(t(
         result.count === 1
           ? 'cvTemplates.extractDialog.success'
@@ -196,8 +197,6 @@ export default function CvDocumentsPage() {
       setSelectedIndexes(new Set());
     } catch (err) {
       setExtractError(err instanceof Error ? err.message : t('cvTemplates.extractDialog.errorSave'));
-    } finally {
-      setSavingExtract(false);
     }
   };
 

@@ -1,11 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, LoaderCircle, Trash2 } from 'lucide-react';
-import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
 import WishlistButton from '../components/pipeline/WishlistButton';
 import { APPLICATION_STATUSES, type Application, type ApplicationStatus } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import {
+  useApplications,
+  useDeleteApplication,
+  usePrefetchApplication,
+  useUpdateApplicationWishlist,
+} from '../queries';
 import {
   Button,
   Card,
@@ -21,15 +26,13 @@ import {
 export default function PipelinePage() {
   const navigate = useNavigate();
   const { t, formatDate } = useLocale();
-  const [applications, setApplications] = useState<Application[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: applicationsData, isPending } = useApplications();
+  const applications = applicationsData ?? [];
+  const deleteApplication = useDeleteApplication();
+  const updateWishlist = useUpdateApplicationWishlist();
+  const prefetchApplication = usePrefetchApplication();
   const [filter, setFilter] = useState<'all' | ApplicationStatus>('all');
   const [toDelete, setToDelete] = useState<Application | null>(null);
-  const [deleting, setDeleting] = useState(false);
-
-  useEffect(() => {
-    api.getApplications().then(setApplications).finally(() => setLoading(false));
-  }, []);
 
   const statusCounts = APPLICATION_STATUSES.reduce(
     (acc, status) => {
@@ -44,29 +47,21 @@ export default function PipelinePage() {
 
   const confirmDelete = async () => {
     if (!toDelete) return;
-    setDeleting(true);
     try {
-      await api.deleteApplication(toDelete._id);
-      setApplications((prev) => prev.filter((a) => a._id !== toDelete._id));
+      await deleteApplication.mutateAsync(toDelete._id);
       setToDelete(null);
-    } finally {
-      setDeleting(false);
+    } catch {
+      // keep dialog open on failure
     }
   };
 
-  const toggleWishlist = async (app: Application) => {
-    const next = !app.isWishlisted;
-    setApplications((prev) =>
-      prev.map((a) => (a._id === app._id ? { ...a, isWishlisted: next } : a))
-    );
-    try {
-      const updated = await api.updateApplicationWishlist(app._id, next);
-      setApplications((prev) => prev.map((a) => (a._id === updated._id ? updated : a)));
-    } catch {
-      setApplications((prev) =>
-        prev.map((a) => (a._id === app._id ? { ...a, isWishlisted: app.isWishlisted } : a))
-      );
-    }
+  const toggleWishlist = (app: Application) => {
+    updateWishlist.mutate({ id: app._id, isWishlisted: !app.isWishlisted });
+  };
+
+  const openApplication = (id: string) => {
+    prefetchApplication(id);
+    navigate(`/applications/${id}`);
   };
 
   return (
@@ -93,7 +88,7 @@ export default function PipelinePage() {
         ))}
       </div>
 
-      {loading ? (
+      {isPending && !applicationsData ? (
         <div className="flex flex-col gap-3">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-28" />
@@ -108,7 +103,9 @@ export default function PipelinePage() {
               <div className="flex items-stretch">
                 <button
                   type="button"
-                  onClick={() => navigate(`/applications/${app._id}`)}
+                  onClick={() => openApplication(app._id)}
+                  onMouseEnter={() => prefetchApplication(app._id)}
+                  onFocus={() => prefetchApplication(app._id)}
                   className="min-w-0 flex-1 p-4 text-left transition-colors hover:bg-canvas/70"
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -161,15 +158,26 @@ export default function PipelinePage() {
 
       <Dialog
         open={!!toDelete}
-        onClose={() => !deleting && setToDelete(null)}
+        onClose={() => !deleteApplication.isPending && setToDelete(null)}
         title={t('pipeline.deleteTitle')}
         actions={
           <>
-            <DialogCancelButton onClick={() => setToDelete(null)} disabled={deleting}>
+            <DialogCancelButton
+              onClick={() => setToDelete(null)}
+              disabled={deleteApplication.isPending}
+            >
               {t('common.cancel')}
             </DialogCancelButton>
-            <Button variant="danger" onClick={confirmDelete} disabled={deleting}>
-              {deleting ? <LoaderCircle size={16} className="animate-spin" /> : t('common.delete')}
+            <Button
+              variant="danger"
+              onClick={confirmDelete}
+              disabled={deleteApplication.isPending}
+            >
+              {deleteApplication.isPending ? (
+                <LoaderCircle size={16} className="animate-spin" />
+              ) : (
+                t('common.delete')
+              )}
             </Button>
           </>
         }

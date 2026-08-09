@@ -120,7 +120,7 @@ export default function MoreMenu({ open, onClose }: Props) {
         ref={panelRef}
         role="menu"
         className={cn(
-          'absolute bottom-[calc(4.75rem+env(safe-area-inset-bottom))] right-3 left-3 mx-auto max-w-sm overflow-hidden rounded-[18px] border border-line bg-surface shadow-soft transition-[opacity,transform] ease-out motion-reduce:transition-none sm:left-auto sm:right-4 sm:w-64 lg:bottom-auto lg:top-20 lg:right-auto lg:left-4',
+          'absolute bottom-[calc(4.25rem+env(safe-area-inset-bottom))] right-3 left-3 mx-auto max-w-sm overflow-hidden rounded-[18px] border border-line bg-surface shadow-soft transition-[opacity,transform] ease-out motion-reduce:transition-none sm:left-auto sm:right-4 sm:w-64 lg:bottom-auto lg:top-20 lg:right-auto lg:left-4',
           visible
             ? 'translate-y-0 scale-100 opacity-100'
             : 'translate-y-3 scale-[0.97] opacity-0 lg:-translate-y-2'

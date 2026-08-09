@@ -3,7 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
   Box,
   Typography,
-  Tabs,
   Tab,
   Button,
   Card,
@@ -32,6 +31,7 @@ import {
   Link,
   IconButton,
   Menu,
+  Skeleton,
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import SendIcon from '@mui/icons-material/Send';
@@ -41,35 +41,68 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import { FormattedJobText } from '../components/FormattedJobText';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
-import { api } from '../services/api';
 import StatusBadge from '../components/pipeline/StatusBadge';
 import WishlistButton from '../components/pipeline/WishlistButton';
 import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
+import { ScrollableFadeTabs } from '../components/ScrollableFadeTabs';
 import { PageHeader } from '../ui';
 import {
-  type Application,
   type ApplicationStatus,
-  type ApplicationTemplate,
-  type Company,
-  type CvTemplate,
   type DocumentSet,
-  type Recommendation,
   type InterviewContext,
   type InterviewRound,
   type InterviewType,
   type InterviewFormat,
 } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import {
+  useAddNote,
+  useAnalyzeApplication,
+  useAnswerQuestions,
+  useApplication,
+  useApplicationTemplates,
+  useCompany,
+  useCvTemplates,
+  useDeleteApplication,
+  useDeleteDocument,
+  useDocuments,
+  useExportPdf,
+  useGenerateDocuments,
+  useInterviewPrep,
+  useRecommendations,
+  useReviseDocuments,
+  useSaveDocument,
+  useSendEmail,
+  useUpdateApplicationStatus,
+  useUpdateApplicationWishlist,
+} from '../queries';
 
 export default function ApplicationPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { t, formatDateTime } = useLocale();
-  const [app, setApp] = useState<Application | null>(null);
-  const [company, setCompany] = useState<Company | null>(null);
-  const [documents, setDocuments] = useState<DocumentSet[]>([]);
+  const { data: app, isPending: appPending } = useApplication(id);
+  const { data: documents = [] } = useDocuments(id);
+  const { data: company } = useCompany(app?.companyId);
+  const { data: cvTemplates = [] } = useCvTemplates();
+  const { data: appTemplates = [] } = useApplicationTemplates();
+  const { data: recommendations = [] } = useRecommendations();
+
+  const analyzeMutation = useAnalyzeApplication();
+  const generateMutation = useGenerateDocuments();
+  const reviseMutation = useReviseDocuments();
+  const saveDocumentMutation = useSaveDocument();
+  const deleteDocumentMutation = useDeleteDocument();
+  const wishlistMutation = useUpdateApplicationWishlist();
+  const statusMutation = useUpdateApplicationStatus();
+  const interviewMutation = useInterviewPrep();
+  const answerMutation = useAnswerQuestions();
+  const noteMutation = useAddNote();
+  const exportPdfMutation = useExportPdf();
+  const sendEmailMutation = useSendEmail();
+  const deleteApplicationMutation = useDeleteApplication();
+
   const [tab, setTab] = useState(0);
-  const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState('');
   const [note, setNote] = useState('');
   const [answer, setAnswer] = useState('');
@@ -87,13 +120,8 @@ export default function ApplicationPage() {
   });
   const [generateDialog, setGenerateDialog] = useState(false);
   const [deleteDialog, setDeleteDialog] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [documentToDelete, setDocumentToDelete] = useState<DocumentSet | null>(null);
-  const [deletingDocument, setDeletingDocument] = useState(false);
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
-  const [cvTemplates, setCvTemplates] = useState<CvTemplate[]>([]);
-  const [appTemplates, setAppTemplates] = useState<ApplicationTemplate[]>([]);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<string[]>([]);
   const [selectedCvTemplateId, setSelectedCvTemplateId] = useState('');
   const [selectedAppTemplateId, setSelectedAppTemplateId] = useState('');
@@ -103,37 +131,35 @@ export default function ApplicationPage() {
   const [reviseInstruction, setReviseInstruction] = useState('');
   const [docActionError, setDocActionError] = useState('');
 
-  const load = async () => {
-    if (!id) return;
-    const [application, docs] = await Promise.all([
-      api.getApplication(id),
-      api.getDocuments(id),
-    ]);
-    setApp(application);
-    setDocuments(docs);
-    if (application.companyId) {
-      const c = await api.getCompany(application.companyId);
-      setCompany(c);
-    } else {
-      setCompany(null);
-    }
-  };
-
   useEffect(() => {
-    load().finally(() => setLoading(false));
+    setTab(0);
+    setEditingDocId(null);
+    setReviseDocId(null);
+    setDocActionError('');
   }, [id]);
 
-  if (loading || !app) {
+  if (appPending && !app) {
+    return (
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Skeleton variant="text" width="60%" height={40} />
+        <Skeleton variant="rounded" height={48} />
+        <Skeleton variant="rounded" height={240} />
+      </Box>
+    );
+  }
+
+  if (!app) {
     return <CircularProgress />;
   }
 
   const analysis = app.aiAnalysis;
+  const deleting = deleteApplicationMutation.isPending;
+  const deletingDocument = deleteDocumentMutation.isPending;
 
   const runAnalyze = async () => {
     setActionLoading('analyze');
     try {
-      const updated = await api.analyzeApplication(app._id);
-      setApp(updated);
+      await analyzeMutation.mutateAsync(app._id);
       setTab(2);
     } finally {
       setActionLoading('');
@@ -143,12 +169,13 @@ export default function ApplicationPage() {
   const runGenerate = async () => {
     setActionLoading('generate');
     try {
-      const result = await api.generateDocuments(app._id, {
-        cvTemplateId: selectedCvTemplateId || undefined,
-        applicationTemplateId: selectedAppTemplateId || undefined,
+      await generateMutation.mutateAsync({
+        id: app._id,
+        options: {
+          cvTemplateId: selectedCvTemplateId || undefined,
+          applicationTemplateId: selectedAppTemplateId || undefined,
+        },
       });
-      setApp(result.application);
-      setDocuments(await api.getDocuments(app._id));
       setGenerateDialog(false);
       setTab(1);
     } finally {
@@ -156,26 +183,16 @@ export default function ApplicationPage() {
     }
   };
 
-  const openGenerateDialog = async () => {
-    const [cvs, apps] = await Promise.all([api.getCvTemplates(), api.getApplicationTemplates()]);
-    setCvTemplates(cvs);
-    setAppTemplates(apps);
-    const defaultCv = cvs.find((c) => c.isDefault);
-    const defaultApp = apps.find((a) => a.isDefault);
+  const openGenerateDialog = () => {
+    const defaultCv = cvTemplates.find((c) => c.isDefault);
+    const defaultApp = appTemplates.find((a) => a.isDefault);
     setSelectedCvTemplateId(defaultCv?._id || '');
     setSelectedAppTemplateId(defaultApp?._id || '');
     setGenerateDialog(true);
   };
 
-  const toggleWishlist = async () => {
-    const next = !app.isWishlisted;
-    setApp({ ...app, isWishlisted: next });
-    try {
-      const updated = await api.updateApplicationWishlist(app._id, next);
-      setApp(updated);
-    } catch {
-      setApp({ ...app, isWishlisted: app.isWishlisted });
-    }
+  const toggleWishlist = () => {
+    wishlistMutation.mutate({ id: app._id, isWishlisted: !app.isWishlisted });
   };
 
   const changeStatus = async (status: ApplicationStatus) => {
@@ -183,17 +200,15 @@ export default function ApplicationPage() {
       setInterviewDialog(true);
       return;
     }
-    const updated = await api.updateApplicationStatus(app._id, status);
-    setApp(updated);
+    await statusMutation.mutateAsync({ id: app._id, status });
   };
 
   const submitInterviewPrep = async () => {
     setInterviewDialog(false);
     setActionLoading('interview');
     try {
-      const result = await api.interviewPrep(app._id, interviewContext);
-      const updated = await api.updateApplicationStatus(app._id, 'interview');
-      setApp({ ...result.application, status: updated.status, statusHistory: updated.statusHistory });
+      await interviewMutation.mutateAsync({ id: app._id, context: interviewContext });
+      await statusMutation.mutateAsync({ id: app._id, status: 'interview' });
       setTab(4);
     } finally {
       setActionLoading('');
@@ -203,10 +218,10 @@ export default function ApplicationPage() {
   const submitAnswer = async () => {
     if (!selectedQuestion || !answer) return;
     const question = selectedQuestion;
-    const updated = await api.answerQuestions(app._id, [
-      { question, answer, saveToKnowledge },
-    ]);
-    setApp(updated);
+    const updated = await answerMutation.mutateAsync({
+      id: app._id,
+      answers: [{ question, answer, saveToKnowledge }],
+    });
     setAnswer('');
     setSelectedQuestion('');
     if (saveToKnowledge) {
@@ -220,17 +235,14 @@ export default function ApplicationPage() {
 
   const addNote = async () => {
     if (!note.trim()) return;
-    const updated = await api.addNote(app._id, note);
-    setApp(updated);
+    await noteMutation.mutateAsync({ id: app._id, text: note });
     setNote('');
   };
 
   const runExportPdf = async (documentSetId?: string) => {
     setActionLoading('pdf');
     try {
-      const result = await api.exportPdf(app._id, documentSetId);
-      setDocuments(await api.getDocuments(app._id));
-      return result;
+      return await exportPdfMutation.mutateAsync({ id: app._id, documentSetId });
     } finally {
       setActionLoading('');
     }
@@ -238,7 +250,7 @@ export default function ApplicationPage() {
 
   const displayCompanyName = company?.name || app.job.companyName;
 
-  const openEmailDialog = async () => {
+  const openEmailDialog = () => {
     setEmailForm({
       to: app.job.contactEmail || app.emailDraft?.to || '',
       subject: app.emailDraft?.subject || t('application.emailDraft.subject', { title: app.job.title, company: displayCompanyName }),
@@ -249,17 +261,11 @@ export default function ApplicationPage() {
     setSelectedRecommendationIds([]);
     setEmailError('');
     setEmailDialog(true);
-    try {
-      const recs = await api.getRecommendations();
-      setRecommendations(recs);
-    } catch {
-      setRecommendations([]);
-    }
   };
 
-  const toggleRecommendation = (id: string) => {
+  const toggleRecommendation = (recId: string) => {
     setSelectedRecommendationIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+      prev.includes(recId) ? prev.filter((x) => x !== recId) : [...prev, recId]
     );
   };
 
@@ -269,15 +275,16 @@ export default function ApplicationPage() {
     try {
       const docId = app.activeDocumentSetId || documents[0]?._id;
       if (docId) {
-        await api.exportPdf(app._id, docId);
-        setDocuments(await api.getDocuments(app._id));
+        await exportPdfMutation.mutateAsync({ id: app._id, documentSetId: docId });
       }
-      const result = await api.sendEmail(app._id, {
-        ...emailForm,
-        documentSetId: docId,
-        recommendationIds: selectedRecommendationIds,
+      await sendEmailMutation.mutateAsync({
+        id: app._id,
+        data: {
+          ...emailForm,
+          documentSetId: docId,
+          recommendationIds: selectedRecommendationIds,
+        },
       });
-      setApp(result.application);
       setEmailDialog(false);
     } catch (e) {
       setEmailError(e instanceof Error ? e.message : t('application.emailDialog.errorSend'));
@@ -287,22 +294,21 @@ export default function ApplicationPage() {
   };
 
   const confirmDelete = async () => {
-    setDeleting(true);
     try {
-      await api.deleteApplication(app._id);
+      await deleteApplicationMutation.mutateAsync(app._id);
       navigate('/pipeline');
-    } finally {
-      setDeleting(false);
+    } catch {
+      // stay on page
     }
   };
 
   const confirmDeleteDocument = async () => {
     if (!documentToDelete) return;
-    setDeletingDocument(true);
     try {
-      const result = await api.deleteDocument(app._id, documentToDelete._id);
-      setApp(result.application);
-      setDocuments(await api.getDocuments(app._id));
+      await deleteDocumentMutation.mutateAsync({
+        id: app._id,
+        documentSetId: documentToDelete._id,
+      });
       setDocumentToDelete(null);
       if (editingDocId === documentToDelete._id) {
         setEditingDocId(null);
@@ -312,8 +318,8 @@ export default function ApplicationPage() {
         setReviseDocId(null);
         setReviseInstruction('');
       }
-    } finally {
-      setDeletingDocument(false);
+    } catch {
+      // keep dialog open
     }
   };
 
@@ -339,12 +345,13 @@ export default function ApplicationPage() {
     setActionLoading('save-doc');
     setDocActionError('');
     try {
-      const result = await api.saveDocument(app._id, {
-        coverLetter: { content: editDraft.trim() },
-        basedOnDocumentSetId: doc._id,
+      await saveDocumentMutation.mutateAsync({
+        id: app._id,
+        data: {
+          coverLetter: { content: editDraft.trim() },
+          basedOnDocumentSetId: doc._id,
+        },
       });
-      setApp(result.application);
-      setDocuments(await api.getDocuments(app._id));
       setEditingDocId(null);
       setEditDraft('');
     } catch (e) {
@@ -376,12 +383,13 @@ export default function ApplicationPage() {
     setActionLoading('revise');
     setDocActionError('');
     try {
-      const result = await api.reviseDocuments(app._id, {
-        instruction: reviseInstruction.trim(),
-        documentSetId: doc._id,
+      await reviseMutation.mutateAsync({
+        id: app._id,
+        data: {
+          instruction: reviseInstruction.trim(),
+          documentSetId: doc._id,
+        },
       });
-      setApp(result.application);
-      setDocuments(await api.getDocuments(app._id));
       setReviseDocId(null);
       setReviseInstruction('');
     } catch (e) {
@@ -523,13 +531,10 @@ export default function ApplicationPage() {
         )}
       </Box>
 
-      <Tabs
+      <ScrollableFadeTabs
         value={tab}
         onChange={(_, v) => setTab(v)}
-        variant="scrollable"
-        scrollButtons="auto"
-        allowScrollButtonsMobile
-        sx={{ mb: 2, maxWidth: '100%', minWidth: 0 }}
+        sx={{ mb: 2 }}
       >
         <Tab label={t('application.tabs.job')} />
         <Tab
@@ -554,7 +559,7 @@ export default function ApplicationPage() {
         <Tab label={t('application.tabs.company')} />
         <Tab label={t('application.tabs.interview')} />
         <Tab label={t('application.tabs.notes')} />
-      </Tabs>
+      </ScrollableFadeTabs>
 
       {tab === 0 && (
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -577,14 +582,14 @@ export default function ApplicationPage() {
               <Box
                 sx={{
                   display: 'flex',
-                  alignItems: 'flex-start',
+                  alignItems: 'center',
                   justifyContent: 'space-between',
                   gap: 1.5,
                   flexWrap: 'wrap',
                 }}
               >
                 {app.job.location ? (
-                  <Typography variant="body2" color="text.secondary" sx={{ pt: 0.5 }}>
+                  <Typography variant="body2" color="text.secondary">
                     📍 {app.job.location}
                   </Typography>
                 ) : (

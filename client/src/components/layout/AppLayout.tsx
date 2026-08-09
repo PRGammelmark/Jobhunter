@@ -175,7 +175,7 @@ function AppLayoutInner() {
 
   const mobileNavButtonClass = (active: boolean) =>
     cn(
-      'flex min-w-0 flex-col items-center justify-center gap-1 px-0.5 pb-2 pt-2 text-[11px] font-semibold',
+      'flex min-w-0 flex-col items-center justify-center gap-0.5 px-0.5 pb-1 pt-1.5 text-[11px] font-semibold',
       active ? 'text-brand' : 'text-ink-muted'
     );
 
@@ -296,7 +296,7 @@ function AppLayoutInner() {
 
       {/* Mobile bottom nav + center FAB — fixed to viewport */}
       <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/95 px-2 pb-[env(safe-area-inset-bottom,0px)] backdrop-blur-md lg:hidden">
-        <div className="relative mx-auto grid h-[4.25rem] max-w-lg grid-cols-5 items-end">
+        <div className="relative mx-auto grid h-14 max-w-lg grid-cols-5 items-end">
           {mobileNav.slice(0, 2).map((item) => {
             const Icon = item.icon;
             const active = currentMobile === item.value;
@@ -313,14 +313,14 @@ function AppLayoutInner() {
             );
           })}
 
-          <div className="relative flex justify-center">
+          <div className="relative flex justify-center pb-1">
             {!hideMobileFab && (
               <IconButton
                 label={t('nav.newJobPosting')}
                 onClick={() => navigate('/new')}
-                className="-mt-7 h-14 w-14 rounded-full bg-brand text-white shadow-[var(--shadow-fab)] hover:bg-brand-hover hover:text-white"
+                className="-mt-9 h-16 w-16 rounded-full bg-brand text-white shadow-[var(--shadow-fab)] hover:bg-brand-hover hover:text-white"
               >
-                <Plus size={26} strokeWidth={2.5} />
+                <Plus size={30} strokeWidth={2.5} />
               </IconButton>
             )}
           </div>

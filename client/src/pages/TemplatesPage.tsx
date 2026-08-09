@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import {
   Box,
   Button,
@@ -10,9 +10,14 @@ import {
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import EditNoteIcon from '@mui/icons-material/EditNote';
-import { api } from '../services/api';
 import type { ApplicationTemplate } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import {
+  useApplicationTemplates,
+  useCreateApplicationTemplate,
+  useCreateApplicationTemplateManual,
+  useDeleteApplicationTemplate,
+} from '../queries';
 import { PageHeader } from '../ui';
 import {
   TemplateList,
@@ -23,31 +28,25 @@ import {
 
 export default function TemplatesPage() {
   const { t } = useLocale();
-  const [appTemplates, setAppTemplates] = useState<ApplicationTemplate[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: appTemplates, isPending } = useApplicationTemplates();
+  const templateList = appTemplates ?? [];
+  const createTemplate = useCreateApplicationTemplate();
+  const createManual = useCreateApplicationTemplateManual();
+  const deleteTemplate = useDeleteApplicationTemplate();
   const [viewer, setViewer] = useState<ViewableDocument | null>(null);
   const [toDelete, setToDelete] = useState<ApplicationTemplate | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const [manualForm, setManualForm] = useState({ name: '', content: '' });
-  const [saving, setSaving] = useState(false);
   const appFileRef = useRef<HTMLInputElement>(null);
 
-  const load = async () => {
-    const apps = await api.getApplicationTemplates();
-    setAppTemplates(apps);
-  };
-
-  useEffect(() => {
-    load().finally(() => setLoading(false));
-  }, []);
+  const saving = createManual.isPending;
+  const deleting = deleteTemplate.isPending;
 
   const uploadApp = async (file: File) => {
     const form = new FormData();
     form.append('file', file);
     form.append('name', file.name.replace(/\.[^.]+$/, ''));
-    await api.createApplicationTemplate(form);
-    load();
+    await createTemplate.mutateAsync(form);
   };
 
   const openManual = () => {
@@ -57,26 +56,22 @@ export default function TemplatesPage() {
 
   const saveManual = async () => {
     if (!manualForm.name.trim() || !manualForm.content.trim()) return;
-    setSaving(true);
     try {
-      await api.createApplicationTemplateManual({ name: manualForm.name, rawText: manualForm.content });
+      await createManual.mutateAsync({ name: manualForm.name, rawText: manualForm.content });
       setManualOpen(false);
-      load();
-    } finally {
-      setSaving(false);
+    } catch {
+      // keep dialog open
     }
   };
 
   const confirmDelete = async () => {
     if (!toDelete) return;
-    setDeleting(true);
     try {
-      await api.deleteApplicationTemplate(toDelete._id);
+      await deleteTemplate.mutateAsync(toDelete._id);
       if (viewer?._id === toDelete._id) setViewer(null);
       setToDelete(null);
-      load();
-    } finally {
-      setDeleting(false);
+    } catch {
+      // keep dialog open
     }
   };
 
@@ -112,8 +107,8 @@ export default function TemplatesPage() {
       </Box>
 
       <TemplateList
-        items={appTemplates}
-        loading={loading}
+        items={templateList}
+        loading={isPending && !appTemplates}
         emptyLabel={t('cvTemplates.empty.appTemplates')}
         previewLabel={t('cvTemplates.preview.template')}
         onDelete={(item) => setToDelete(item as ApplicationTemplate)}

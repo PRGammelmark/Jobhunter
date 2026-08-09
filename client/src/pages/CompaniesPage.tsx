@@ -1,20 +1,14 @@
-import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Plus } from 'lucide-react';
-import { api } from '../services/api';
-import type { Company } from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
+import { useCompanies } from '../queries';
 import { Badge, CardButton, EmptyState, IconButton, PageHeader, Skeleton } from '../ui';
 
 export default function CompaniesPage() {
   const navigate = useNavigate();
   const { t, formatDate } = useLocale();
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    api.getCompanies().then(setCompanies).finally(() => setLoading(false));
-  }, []);
+  const { data: companiesData, isPending } = useCompanies();
+  const companies = companiesData ?? [];
 
   return (
     <div className="pb-20 lg:pb-0">
@@ -33,7 +27,7 @@ export default function CompaniesPage() {
         }
       />
 
-      {loading ? (
+      {isPending && !companiesData ? (
         <div className="flex flex-col gap-3">
           {[1, 2, 3].map((i) => (
             <Skeleton key={i} className="h-24" />

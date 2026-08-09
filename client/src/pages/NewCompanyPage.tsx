@@ -13,6 +13,7 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import { api } from '../services/api';
 import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import { useLocale } from '../i18n';
+import { useCreateCompany } from '../queries';
 import { PageHeader } from '../ui';
 
 type CompanyForm = {
@@ -50,12 +51,13 @@ function mergeResearch(form: CompanyForm, research: Partial<CompanyForm>): Compa
 export default function NewCompanyPage() {
   const navigate = useNavigate();
   const { t } = useLocale();
+  const createCompany = useCreateCompany();
   const [form, setForm] = useState<CompanyForm>(emptyForm);
-  const [loading, setLoading] = useState(false);
   const [researching, setResearching] = useState(false);
   const [error, setError] = useState('');
   const [researchError, setResearchError] = useState<string | null>(null);
   const [researchSources, setResearchSources] = useState<string[] | null>(null);
+  const loading = createCompany.isPending;
 
   const autoFill = async () => {
     const searchName = form.name.trim();
@@ -88,10 +90,9 @@ export default function NewCompanyPage() {
       return;
     }
 
-    setLoading(true);
     setError('');
     try {
-      const company = await api.createCompany({
+      const company = await createCompany.mutateAsync({
         name: form.name.trim(),
         cvr: form.cvr.trim() || undefined,
         description: form.description.trim() || undefined,
@@ -104,8 +105,6 @@ export default function NewCompanyPage() {
       navigate(`/companies/${company._id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : t('newCompany.errorCreate'));
-    } finally {
-      setLoading(false);
     }
   };
 

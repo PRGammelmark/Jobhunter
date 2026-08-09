@@ -186,6 +186,10 @@ const companySchema = new Schema<ICompany>(
   { timestamps: true }
 );
 companySchema.index({ tenantId: 1, normalizedName: 1 }, { unique: true });
+companySchema.index(
+  { tenantId: 1, cvr: 1 },
+  { unique: true, partialFilterExpression: { cvr: { $type: 'string', $gt: '' } } }
+);
 companySchema.index({ tenantId: 1, lastActivityAt: -1 });
 
 export interface IKnowledgeEntry extends Document {
