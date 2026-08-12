@@ -13,6 +13,7 @@ import {
   IconButton,
   FormControlLabel,
   Switch,
+  type SwitchProps,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -24,6 +25,65 @@ import { useLocale } from '../../i18n';
 
 export type TemplateItem = CvTemplate | ApplicationTemplate;
 export type ViewableDocument = TemplateItem | Recommendation;
+
+/** Compact iOS-style toggle used for “Standard” on templates. */
+export function IosSwitch(props: SwitchProps) {
+  const { sx, ...rest } = props;
+  return (
+    <Switch
+      focusVisibleClassName=".Mui-focusVisible"
+      disableRipple
+      {...rest}
+      sx={[
+        {
+          width: 42,
+          height: 26,
+          padding: 0,
+          '& .MuiSwitch-switchBase': {
+            padding: 0,
+            margin: '2px',
+            transitionDuration: '200ms',
+            '&.Mui-checked': {
+              transform: 'translateX(16px)',
+              color: '#fff',
+              '& + .MuiSwitch-track': {
+                backgroundColor: '#ff5722',
+                opacity: 1,
+                border: 0,
+              },
+              '&.Mui-disabled + .MuiSwitch-track': {
+                opacity: 0.5,
+              },
+            },
+            '&.Mui-focusVisible .MuiSwitch-thumb': {
+              color: '#ff5722',
+              border: '6px solid #fff',
+            },
+            '&.Mui-disabled .MuiSwitch-thumb': {
+              color: '#f4f5f7',
+            },
+            '&.Mui-disabled + .MuiSwitch-track': {
+              opacity: 0.7,
+            },
+          },
+          '& .MuiSwitch-thumb': {
+            boxSizing: 'border-box',
+            width: 22,
+            height: 22,
+            boxShadow: '0 1px 3px rgb(0 0 0 / 0.22)',
+          },
+          '& .MuiSwitch-track': {
+            borderRadius: 13,
+            backgroundColor: '#E9E9EA',
+            opacity: 1,
+            transition: 'background-color 200ms',
+          },
+        },
+        ...(Array.isArray(sx) ? sx : sx ? [sx] : []),
+      ]}
+    />
+  );
+}
 
 export function formatFileSize(bytes?: number): string {
   if (!bytes) return '';
@@ -80,10 +140,9 @@ export function TemplateList({
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
                 {onDefaultChange ? (
                   <FormControlLabel
-                    sx={{ mr: 0.5, ml: 0 }}
+                    sx={{ mr: 0.5, ml: 0, gap: 0.75 }}
                     control={
-                      <Switch
-                        size="small"
+                      <IosSwitch
                         checked={checked}
                         disabled={defaultSwitchDisabled}
                         onChange={(_, next) => onDefaultChange(item, next)}

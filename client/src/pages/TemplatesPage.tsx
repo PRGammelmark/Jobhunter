@@ -16,7 +16,6 @@ import {
   ListItemText,
   Divider,
   FormControlLabel,
-  Switch,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
@@ -45,6 +44,7 @@ import {
   TemplateList,
   DocumentViewerDialog,
   DeleteDocumentDialog,
+  IosSwitch,
   type ViewableDocument,
 } from './cv/shared';
 
@@ -210,12 +210,11 @@ export default function TemplatesPage() {
                     </Typography>
                   </Box>
                   <FormControlLabel
-                    sx={{ mr: 0, ml: 0, flexShrink: 0, alignItems: 'center' }}
+                    sx={{ mr: 0, ml: 0, flexShrink: 0, alignItems: 'center', gap: 0.75 }}
                     onClick={(e) => e.stopPropagation()}
                     onFocus={(e) => e.stopPropagation()}
                     control={
-                      <Switch
-                        size="small"
+                      <IosSwitch
                         checked={isDefault}
                         disabled={savingDefault || !settings}
                         onChange={(_, checked) =>

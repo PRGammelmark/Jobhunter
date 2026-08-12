@@ -4,6 +4,7 @@ import {
   BriefcaseBusiness,
   ChartColumn,
   ChevronLeft,
+  ChevronUp,
   FileText,
   Home,
   LayoutGrid,
@@ -14,11 +15,11 @@ import {
   Settings,
   Building2,
   Users,
-  LogOut,
 } from 'lucide-react';
 import { useLocale } from '../../i18n';
 import { useAuth } from '../../auth/AuthContext';
 import { BrandMark, Button, cn, IconButton } from '../../ui';
+import AccountMenu, { userInitials } from './AccountMenu';
 import LanguageSwitcher from './LanguageSwitcher';
 import MoreMenu from './MoreMenu';
 import { PageMetaProvider, usePageMeta } from './PageMetaContext';
@@ -42,13 +43,6 @@ function AdminRoute() {
   const { user } = useAuth();
   if (user?.platformRole !== 'admin') return <Navigate to="/" replace />;
   return <Outlet />;
-}
-
-function userInitials(name?: string) {
-  if (!name?.trim()) return '?';
-  const parts = name.trim().split(/\s+/);
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 function DesktopTopBar() {
@@ -104,8 +98,10 @@ function AppLayoutInner() {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useLocale();
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const accountTriggerRef = useRef<HTMLButtonElement>(null);
 
   const mobileNav = [
     { label: t('nav.home'), value: '/', icon: Home },
@@ -123,10 +119,12 @@ function AppLayoutInner() {
     { label: t('nav.companies'), value: '/companies', icon: Building2 },
     { label: t('nav.statistics'), value: '/statistics', icon: ChartColumn },
     { label: t('nav.settings'), value: '/settings', icon: Settings },
-    ...(user?.platformRole === 'admin'
-      ? [{ label: t('nav.users'), value: '/platform/users', icon: Users }]
-      : []),
   ];
+
+  const platformAdminNav =
+    user?.platformRole === 'admin'
+      ? [{ label: t('nav.users'), value: '/platform/users', icon: Users }]
+      : [];
 
   const pathActive = (value: string) => {
     if (value === '/') return location.pathname === '/';
@@ -147,11 +145,6 @@ function AppLayoutInner() {
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0, left: 0 });
   }, [location.pathname, location.search]);
-
-  const onLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
 
   const onMobileBack = () => {
     if (location.key !== 'default') {
@@ -207,28 +200,72 @@ function AppLayoutInner() {
               </Link>
             );
           })}
+
+          {platformAdminNav.length > 0 && (
+            <>
+              <div className="mt-4 px-3 pb-1 text-[11px] font-semibold uppercase tracking-wide text-ink-muted">
+                {t('nav.platformAdmin')}
+              </div>
+              {platformAdminNav.map((item) => {
+                const Icon = item.icon;
+                const active = pathActive(item.value);
+                return (
+                  <Link
+                    key={item.value}
+                    to={item.value}
+                    className={cn(
+                      'flex items-center gap-3 rounded-[14px] px-3 py-2.5 text-sm font-semibold transition-colors',
+                      active
+                        ? 'bg-brand-soft text-brand'
+                        : 'text-ink-secondary hover:bg-canvas hover:text-ink'
+                    )}
+                  >
+                    <Icon size={18} strokeWidth={active ? 2.25 : 1.75} />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </nav>
 
         <div className="mt-4 border-t border-line pt-4">
-          <div className="mb-3 flex items-center gap-3 px-1">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-soft text-sm font-bold text-brand">
+          <button
+            ref={accountTriggerRef}
+            type="button"
+            onClick={() => setAccountOpen((open) => !open)}
+            aria-haspopup="menu"
+            aria-expanded={accountOpen}
+            aria-label={t('account.menuAria')}
+            className={cn(
+              'flex w-full items-center gap-3 rounded-[14px] px-1 py-1.5 text-left transition-colors hover:bg-canvas',
+              accountOpen && 'bg-canvas'
+            )}
+          >
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-sm font-bold text-brand">
               {userInitials(user?.name)}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-ink">{user?.name}</div>
               <div className="truncate text-xs text-ink-secondary">{user?.email}</div>
             </div>
-          </div>
-          <button
-            type="button"
-            onClick={() => void onLogout()}
-            className="flex w-full items-center gap-3 rounded-[14px] px-3 py-2.5 text-sm font-medium text-ink-secondary transition-colors hover:bg-canvas hover:text-ink"
-          >
-            <LogOut size={18} strokeWidth={1.75} />
-            {t('nav.logout')}
+            <ChevronUp
+              size={16}
+              strokeWidth={2}
+              className={cn(
+                'mr-1 shrink-0 text-ink-muted transition-transform',
+                accountOpen && 'rotate-180'
+              )}
+            />
           </button>
         </div>
       </aside>
+
+      <AccountMenu
+        open={accountOpen}
+        onClose={() => setAccountOpen(false)}
+        triggerRef={accountTriggerRef}
+      />
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         {/* Mobile top bar — fixed to viewport */}

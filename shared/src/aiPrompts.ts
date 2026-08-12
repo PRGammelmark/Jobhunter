@@ -5,89 +5,129 @@ export function isAppLanguage(value: unknown): value is AppLanguage {
 }
 
 /** Default editable instructions for cover-letter generation. Context is appended by the server. */
-export const DEFAULT_COVER_LETTER_PROMPT_DA = `Skriv en målrettet ansøgning på dansk.
+export const DEFAULT_COVER_LETTER_PROMPT_DA = `Skriv en målrettet ansøgning på dansk ud fra den valgte ANSØGNINGSTYPE eller ANSØGNINGSSKABELON og den øvrige kontekst.
 
-VIGTIGT: Brug KUN information fra Knowledge Base, Om mig, jobopslag og virksomhedsinfo. Opfind ALDRIG historier, tal eller resultater.
-Returnér KUN selve ansøgningsteksten — ingen JSON, ingen forklaringer, ingen CV.
-CV'et nedenfor er KUN kontekst: brug det til at vinkle ansøgningen skarpere og til at vide hvilket CV der sendes med. Kopiér ikke CV-indhold ind i ansøgningen. Genfortæl ikke CV'et — antag, at modtageren allerede har læst det.
+VIGTIGT:
+
+* Brug KUN information fra Knowledge Base, Om mig, jobopslag, virksomhedsinfo og den øvrige angivne kontekst.
+* Opfind ALDRIG historier, erfaringer, teknologier, tal, resultater, motivationer eller andre fakta.
+* Returnér KUN selve ansøgningsteksten — ingen JSON, forklaringer, kommentarer eller CV.
+* CV'et er KUN kontekst. Brug det til at forstå kandidatens baggrund og til at vinkle ansøgningen skarpere, men genfortæl ikke CV'et og kopiér ikke større dele af det ind i ansøgningen.
+* Antag, at modtageren også modtager og kan læse CV'et.
+
+ANSØGNINGSTYPE / ANSØGNINGSSKABELON:
+
+* I KONTEKST angives enten en ANSØGNINGSTYPE eller en ANSØGNINGSSKABELON. Følg dens struktur, fortælleform og overordnede tilgang.
+* Den valgte type/skabelon har forrang i spørgsmål om disposition, rækkefølge, introduktion, argumentationsform og afslutning.
+* Forsøg ikke at presse ansøgningen ind i en anden eller mere klassisk ansøgningsstruktur.
+* Bevar type-/skabelonens særpræg gennem hele teksten.
+* De øvrige instruktioner i denne prompt skal forbedre kvaliteten inden for den valgte type/skabelon — ikke erstatte dens struktur.
 
 FORMAT:
-- Start med præcis den overskrift der er angivet under KONTEKST (én linje, uden markdown).
-- Ingen meta-information i toppen: ingen dato, adresse, telefon, e-mail, LinkedIn, afsenderblok eller lignende.
-- Gå direkte fra overskriften til selve brevet (fx "Kære ...").
-- Maksimalt 350–400 ord. Undgå lange lister og opremsninger.
 
-VINKEL OG INDHOLD:
-- Skriv med udgangspunkt i virksomheden og dens udfordringer – ikke kandidaten.
-- Besvar implicit to spørgsmål: Hvorfor denne virksomhed? og Hvorfor er jeg den rette til netop denne stilling?
-- Træk aktivt på kandidatens konkrete erfaringer, projekter og resultater, og vis hvordan de kan anvendes hos virksomheden.
-- Skriv kandidaten "ind i virksomheden": beskriv, hvordan vedkommende forventes at skabe værdi i netop denne rolle.
-- Vis, hvordan kandidaten kan bidrage – ikke blot hvad kandidaten har lavet tidligere.
-- Prioritér konkrete eksempler frem for generelle påstande. Vis hellere end fortæl.
-- Brug virksomhedens produkter, branche, kunder, teknologi og strategi aktivt i argumentationen, når det er relevant.
-- Lav tydelige koblinger mellem virksomhedens behov og kandidatens erfaring.
-- Vis forståelse for virksomhedens udfordringer og mål, hvis de kan udledes af stillingsopslaget eller virksomhedsprofilen.
-- Inddrag kun erfaringer, der er relevante for den konkrete stilling.
-- Fremhæv resultater, effekter og ansvar frem for blot teknologier og værktøjer.
-- Nævn kun teknologier, når de understøtter en konkret pointe eller et konkret resultat.
-- Hvis kandidaten mangler erfaring inden for et område, så fokuser på tilsvarende erfaring frem for at undskylde manglen.
-- Undgå generiske formuleringer, der kunne sendes til enhver virksomhed. Hold indholdet specifikt for både virksomheden og kandidatens erfaring.
-- Skriv altid, så ansøgningen føles skrevet specifikt til denne ene stilling.
+* Start med præcis den overskrift, der er angivet under KONTEKST. Skriv den på én linje uden markdown.
+* Ingen meta-information i toppen: ingen dato, adresse, telefon, e-mail, LinkedIn, afsenderblok eller lignende.
+* Gå direkte fra overskriften til ansøgningens indhold.
+* Maksimalt 350–400 ord.
+* Brug som udgangspunkt sammenhængende prosa. Brug kun lister, hvis den valgte type/skabelon specifikt lægger op til det.
+* Hold afsnittene relativt korte og læsevenlige.
+
+INDHOLD OG RELEVANS:
+
+* Besvar gennem ansøgningen implicit:
+
+  1. Hvorfor giver kandidaten mening til netop denne virksomhed og stilling?
+  2. Hvilken værdi kan kandidaten skabe i rollen?
+* Træk aktivt på kandidatens relevante erfaringer, projekter, kompetencer og dokumenterede resultater.
+* Skab tydelige forbindelser mellem virksomhedens behov og kandidatens baggrund.
+* Vis så vidt muligt, hvordan tidligere erfaring kan omsættes til værdi i den konkrete rolle.
+* Brug virksomhedens produkter, branche, kunder, marked, teknologi, arbejdsform eller strategi aktivt, når oplysningerne findes og er relevante.
+* Vis forståelse for virksomhedens behov, muligheder eller udfordringer, når de med rimelighed kan udledes af materialet.
+* Prioritér konkrete eksempler frem for generelle påstande.
+* Inddrag kun erfaringer og kompetencer, der understøtter argumentationen for den konkrete stilling.
+* Fremhæv resultater, effekt, ansvar og arbejdsmetode frem for blot at opremse teknologier, værktøjer eller arbejdsopgaver.
+* Nævn kun teknologier og værktøjer, når de understøtter en relevant pointe.
+* Hvis kandidaten ikke har direkte erfaring med et krav, så brug relevant overførbar eller beslægtet erfaring, hvis den findes. Undgå unødvendige undskyldninger.
+* Undgå indhold, der lige så godt kunne stå i en ansøgning til en helt anden virksomhed.
 
 SPROG OG TONE:
-- Undgå standardformuleringer som "Jeg søger hermed...", "Jeg brænder for..." og "Jeg er passioneret omkring...".
-- Gør introduktionen fængende og nysgerrighedsskabende. Den første sætning skal give lyst til at læse videre.
-- Hold sproget naturligt, selvsikkert og professionelt – aldrig overdrevet eller pralende.
-- Undgå at skrive i et autoritativt eller bedrevidende toneleje. Antag aldrig, at virksomheden skal lære noget. Beskriv i stedet, hvordan ansøgerens erfaringer, observationer og arbejdsmetode passer til virksomheden.
-- Undgå buzzwords og floskler, medmindre de er centrale for stillingsopslaget.
-- Skriv i et aktivt sprog med korte, præcise sætninger.
-- Variér sætningslængde og ordvalg for at skabe et naturligt flow.
-- Tilpas tonen til virksomheden (startup, enterprise, offentlig sektor, bureau osv.).
-- Hvert afsnit skal have et tydeligt formål. Fjern alt, der ikke skaber værdi.
-- Skab en rød tråd fra introduktion til afslutning.
-- Afslut med en fremadskuende invitation til dialog frem for en passiv standardafslutning.`;
 
-export const DEFAULT_COVER_LETTER_PROMPT_EN = `Write a targeted cover letter in English.
+* Undgå standardåbninger som "Jeg søger hermed...", "Jeg brænder for..." og "Jeg er passioneret omkring...".
+* Introduktionen skal være konkret, relevant og give lyst til at læse videre, men dens form skal følge den valgte type/skabelon.
+* Skriv naturligt, selvsikkert og professionelt uden at blive pralende.
+* Undgå et autoritativt eller bedrevidende toneleje.
+* Antag ikke, at kandidaten ved mere om virksomheden end virksomheden selv.
+* Formulér analyser af virksomhedens situation som forståelse, observationer eller muligheder — ikke som bastante sandheder, medmindre de direkte fremgår af materialet.
+* Undgå buzzwords, floskler og tomme superlativer, medmindre bestemte begreber er centrale for stillingsopslaget.
+* Brug aktivt og præcist sprog.
+* Variér sætningslængde og ordvalg, så teksten føles menneskelig og naturlig.
+* Tilpas tonen til virksomheden og rollen, fx startup, enterprise, offentlig organisation, bureau eller specialistmiljø.
+* Hvert afsnit skal have et formål og bidrage til argumentationen.
+* Fjern gentagelser og information, som allerede fremgår tydeligt af CV'et uden at tilføre en ny pointe.
+* Skab en tydelig rød tråd gennem ansøgningen.
+* Afslut naturligt og fremadskuende. Afslutningens form skal følge den valgte type/skabelon og må ikke tvinges ind i en bestemt standardform.`;
 
-IMPORTANT: Use ONLY information from the Knowledge Base, About me, job posting and company info. NEVER invent stories, numbers or results.
-Return ONLY the cover letter text — no JSON, no explanations, no CV.
-The CV below is context ONLY: use it to sharpen the angle of the letter and to know which CV is attached. Do not copy CV content into the letter. Do not retell the CV — assume the recipient has already read it.
+export const DEFAULT_COVER_LETTER_PROMPT_EN = `Write a targeted cover letter in English based on the selected APPLICATION TYPE or APPLICATION TEMPLATE and the rest of the context.
+
+IMPORTANT:
+
+* Use ONLY information from the Knowledge Base, About me, job posting, company info and the other provided context.
+* NEVER invent stories, experience, technologies, numbers, results, motivations or other facts.
+* Return ONLY the cover letter text itself — no JSON, explanations, comments or CV.
+* The CV is context ONLY. Use it to understand the candidate's background and to sharpen the letter's angle, but do not retell the CV or copy large parts of it into the letter.
+* Assume the recipient also receives and can read the CV.
+
+APPLICATION TYPE / APPLICATION TEMPLATE:
+
+* CONTEXT specifies either an APPLICATION TYPE or an APPLICATION TEMPLATE. Follow its structure, narrative form and overall approach.
+* The selected type/template takes precedence on outline, order, introduction, argumentation style and closing.
+* Do not force the letter into a different or more classic cover-letter structure.
+* Preserve the distinctive character of the type/template throughout the text.
+* The other instructions in this prompt should improve quality within the selected type/template — not replace its structure.
 
 FORMAT:
-- Start with exactly the heading given under CONTEXT (one line, no markdown).
-- No meta information at the top: no date, address, phone, email, LinkedIn, sender block or similar.
-- Go straight from the heading to the letter itself (e.g. "Dear ...").
-- Maximum 350–400 words. Avoid long lists and enumerations.
 
-ANGLE AND CONTENT:
-- Write with the company and its challenges as the starting point — not the candidate.
-- Implicitly answer two questions: Why this company? and Why am I the right person for this exact role?
-- Actively draw on the candidate's concrete experience, projects and results, and show how they can be applied at the company.
-- Write the candidate "into the company": describe how they are expected to create value in this specific role.
-- Show how the candidate can contribute — not merely what they have done before.
-- Prefer concrete examples over general claims. Show rather than tell.
-- Use the company's products, industry, customers, technology and strategy actively in the argumentation when relevant.
-- Make clear links between the company's needs and the candidate's experience.
-- Show understanding of the company's challenges and goals if they can be inferred from the job posting or company profile.
-- Only include experience that is relevant to the specific role.
-- Emphasize results, impact and responsibility over technologies and tools alone.
-- Mention technologies only when they support a concrete point or result.
-- If the candidate lacks experience in an area, focus on transferable experience rather than apologizing for the gap.
-- Avoid generic phrasing that could be sent to any company. Keep the content specific to both the company and the candidate's experience.
-- Always write so the letter feels written specifically for this one role.
+* Start with exactly the heading given under CONTEXT. Write it on one line without markdown.
+* No meta information at the top: no date, address, phone, email, LinkedIn, sender block or similar.
+* Go straight from the heading to the letter content.
+* Maximum 350–400 words.
+* Prefer continuous prose by default. Use lists only if the selected type/template specifically calls for them.
+* Keep paragraphs relatively short and readable.
+
+CONTENT AND RELEVANCE:
+
+* Implicitly answer throughout the letter:
+
+  1. Why does the candidate make sense for this company and role in particular?
+  2. What value can the candidate create in the role?
+* Actively draw on the candidate's relevant experience, projects, skills and documented results.
+* Make clear connections between the company's needs and the candidate's background.
+* Where possible, show how past experience can translate into value in this specific role.
+* Use the company's products, industry, customers, market, technology, working methods or strategy actively when the information exists and is relevant.
+* Show understanding of the company's needs, opportunities or challenges when they can reasonably be inferred from the material.
+* Prefer concrete examples over general claims.
+* Include only experience and skills that support the case for this specific role.
+* Emphasize results, impact, responsibility and working methods rather than merely listing technologies, tools or tasks.
+* Mention technologies and tools only when they support a relevant point.
+* If the candidate lacks direct experience with a requirement, use relevant transferable or related experience if it exists. Avoid unnecessary apologies.
+* Avoid content that could equally well appear in an application to a completely different company.
 
 LANGUAGE AND TONE:
-- Avoid stock phrases such as "I hereby apply...", "I am passionate about..." and "I burn for...".
-- Make the introduction engaging and curiosity-sparking. The first sentence should make the reader want to continue.
-- Keep the language natural, confident and professional — never exaggerated or boastful.
-- Avoid an authoritative or know-it-all tone. Never assume the company needs to be taught. Instead describe how the applicant's experience, observations and working methods fit the company.
-- Avoid buzzwords and clichés unless they are central to the job posting.
-- Write in an active voice with short, precise sentences.
-- Vary sentence length and word choice to create a natural flow.
-- Adapt the tone to the company (startup, enterprise, public sector, agency, etc.).
-- Every paragraph should have a clear purpose. Remove anything that does not add value.
-- Create a clear thread from introduction to closing.
-- End with a forward-looking invitation to dialogue rather than a passive standard closing.`;
+
+* Avoid stock openings such as "I hereby apply...", "I am passionate about..." and "I burn for...".
+* The introduction should be concrete, relevant and invite further reading, but its form must follow the selected type/template.
+* Write naturally, confidently and professionally without becoming boastful.
+* Avoid an authoritative or know-it-all tone.
+* Do not assume the candidate knows more about the company than the company itself.
+* Frame analyses of the company's situation as understanding, observations or opportunities — not as firm truths unless they are stated directly in the material.
+* Avoid buzzwords, clichés and empty superlatives unless particular terms are central to the job posting.
+* Use active and precise language.
+* Vary sentence length and word choice so the text feels human and natural.
+* Adapt the tone to the company and role, e.g. startup, enterprise, public organization, agency or specialist environment.
+* Every paragraph should have a purpose and contribute to the argumentation.
+* Remove repetition and information that already appears clearly in the CV without adding a new point.
+* Create a clear thread through the letter.
+* Close naturally and with a forward look. The closing's form must follow the selected type/template and must not be forced into a fixed standard form.`;
 
 /** Backwards-compatible alias (Danish default). */
 export const DEFAULT_COVER_LETTER_PROMPT = DEFAULT_COVER_LETTER_PROMPT_DA;

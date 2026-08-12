@@ -12,6 +12,7 @@ import {
 import { useAuth } from '../../auth/AuthContext';
 import { useLocale } from '../../i18n';
 import { cn } from '../../ui';
+import { AccountSummary } from './AccountMenu';
 import LanguageSwitcher from './LanguageSwitcher';
 
 const MENU_ANIM_MS = 200;
@@ -127,6 +128,9 @@ export default function MoreMenu({ open, onClose }: Props) {
         )}
         style={{ transitionDuration: `${MENU_ANIM_MS}ms` }}
       >
+        <div className="border-b border-line">
+          <AccountSummary compact />
+        </div>
         <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-3">
           <span className="text-sm font-medium text-ink-secondary">{t('settings.language')}</span>
           <LanguageSwitcher />
