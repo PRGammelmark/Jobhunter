@@ -76,6 +76,21 @@ function parseEntryType(value: string | null): KnowledgeEntryType {
   return 'skill';
 }
 
+/** Ensure relatedEntryIds are plain string ids (API must not return populated docs). */
+function normalizeRelatedEntryIds(ids: unknown): string[] {
+  if (!Array.isArray(ids)) return [];
+  return ids
+    .map((id) => {
+      if (typeof id === 'string') return id;
+      if (id && typeof id === 'object' && '_id' in id) {
+        const value = (id as { _id: unknown })._id;
+        return typeof value === 'string' ? value : String(value ?? '');
+      }
+      return String(id ?? '');
+    })
+    .filter(Boolean);
+}
+
 export default function KnowledgeEntryPage() {
   const { t } = useLocale();
   const { id } = useParams<{ id: string }>();
@@ -122,7 +137,13 @@ export default function KnowledgeEntryPage() {
 
   useEffect(() => {
     if (isNew || !loadedEntry) return;
-    setEntry((prev) => (prev._id === loadedEntry._id ? prev : loadedEntry));
+    setEntry((prev) => {
+      if (prev._id === loadedEntry._id) return prev;
+      return {
+        ...loadedEntry,
+        relatedEntryIds: normalizeRelatedEntryIds(loadedEntry.relatedEntryIds),
+      };
+    });
   }, [isNew, loadedEntry]);
 
   useEffect(() => {

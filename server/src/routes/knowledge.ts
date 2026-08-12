@@ -27,7 +27,7 @@ router.get('/:id', async (req, res) => {
   const entry = await KnowledgeEntry.findOne({
     _id: req.params.id,
     tenantId: req.user!.tenantId,
-  }).populate('relatedEntryIds');
+  });
   if (!entry) return res.status(404).json({ error: 'Entry ikke fundet' });
   res.json(entry);
 });
