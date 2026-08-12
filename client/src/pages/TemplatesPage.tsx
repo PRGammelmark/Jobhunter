@@ -1,5 +1,8 @@
 import { useState, useRef } from 'react';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Box,
   Button,
   Dialog,
@@ -8,27 +11,35 @@ import {
   DialogActions,
   TextField,
   Typography,
-  Card,
-  CardContent,
   List,
   ListItem,
   ListItemText,
   Divider,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import {
   APPLICATION_TEMPLATE_TYPE_IDS,
+  DEFAULT_APPLICATION_TEMPLATE_TYPE_ID,
   getApplicationTemplateType,
+  resolveDefaultApplicationTemplate,
   type ApplicationTemplate,
+  type DefaultApplicationTemplatePreference,
 } from '@career-intelligence/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { useLocale } from '../i18n';
 import {
   useApplicationTemplates,
   useCreateApplicationTemplate,
   useCreateApplicationTemplateManual,
   useDeleteApplicationTemplate,
+  useSettings,
+  useUpdateSettings,
 } from '../queries';
+import { keys } from '../queries/keys';
 import { PageHeader } from '../ui';
 import {
   TemplateList,
@@ -59,7 +70,10 @@ function BulletSection({ title, items }: { title: string; items: string[] }) {
 
 export default function TemplatesPage() {
   const { t, locale } = useLocale();
+  const queryClient = useQueryClient();
   const { data: appTemplates, isPending } = useApplicationTemplates();
+  const { data: settings } = useSettings();
+  const updateSettings = useUpdateSettings();
   const templateList = appTemplates ?? [];
   const createTemplate = useCreateApplicationTemplate();
   const createManual = useCreateApplicationTemplateManual();
@@ -72,6 +86,52 @@ export default function TemplatesPage() {
 
   const saving = createManual.isPending;
   const deleting = deleteTemplate.isPending;
+  const savingDefault = updateSettings.isPending;
+
+  const legacyDefaultId = templateList.find((a) => a.isDefault)?._id || null;
+  const defaultPref = resolveDefaultApplicationTemplate(
+    settings?.preferences?.defaultApplicationTemplate,
+    {
+      legacyUserDefaultId: legacyDefaultId,
+      userTemplateExists: (id) => templateList.some((a) => a._id === id),
+    }
+  );
+
+  const setDefaultPreference = async (next: DefaultApplicationTemplatePreference) => {
+    if (!settings) return;
+    await updateSettings.mutateAsync({
+      preferences: {
+        ...settings.preferences,
+        defaultLanguage: settings.preferences?.defaultLanguage || 'da',
+        aiModel: settings.preferences?.aiModel || 'gpt-4o-mini',
+        defaultApplicationTemplate: next,
+      },
+    });
+  };
+
+  const toggleDefault = async (
+    next: DefaultApplicationTemplatePreference,
+    checked: boolean
+  ) => {
+    if (checked) {
+      await setDefaultPreference(next);
+      return;
+    }
+    const isCurrent =
+      defaultPref.source === next.source && defaultPref.id === next.id;
+    if (!isCurrent) return;
+    // Product default cannot be cleared — only replaced by choosing another template
+    if (
+      next.source === 'builtin' &&
+      next.id === DEFAULT_APPLICATION_TEMPLATE_TYPE_ID
+    ) {
+      return;
+    }
+    await setDefaultPreference({
+      source: 'builtin',
+      id: DEFAULT_APPLICATION_TEMPLATE_TYPE_ID,
+    });
+  };
 
   const uploadApp = async (file: File) => {
     const form = new FormData();
@@ -101,6 +161,8 @@ export default function TemplatesPage() {
       await deleteTemplate.mutateAsync(toDelete._id);
       if (viewer?._id === toDelete._id) setViewer(null);
       setToDelete(null);
+      // Server may reset default preference when the deleted template was selected
+      void queryClient.invalidateQueries({ queryKey: keys.settings });
     } catch {
       // keep dialog open
     }
@@ -117,25 +179,65 @@ export default function TemplatesPage() {
         {t('templates.builtinIntro')}
       </Typography>
 
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 4 }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 4 }}>
         {APPLICATION_TEMPLATE_TYPE_IDS.map((typeId) => {
           const type = getApplicationTemplateType(typeId, locale);
+          const isDefault =
+            defaultPref.source === 'builtin' && defaultPref.id === typeId;
           return (
-            <Card key={typeId} variant="outlined">
-              <CardContent>
-                <Typography variant="subtitle1" fontWeight={600}>
-                  {type.title}
-                </Typography>
-                {type.intro && (
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    {type.intro}
-                  </Typography>
-                )}
+            <Accordion key={typeId} disableGutters variant="outlined">
+              <AccordionSummary
+                expandIcon={<ExpandMoreIcon />}
+                aria-controls={`${typeId}-content`}
+                id={`${typeId}-header`}
+              >
+                <Box
+                  sx={{
+                    pr: 1,
+                    display: 'flex',
+                    alignItems: 'flex-start',
+                    justifyContent: 'space-between',
+                    gap: 1,
+                    width: '100%',
+                  }}
+                >
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="subtitle1" fontWeight={600}>
+                      {type.title}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
+                      {type.intro}
+                    </Typography>
+                  </Box>
+                  <FormControlLabel
+                    sx={{ mr: 0, ml: 0, flexShrink: 0, alignItems: 'center' }}
+                    onClick={(e) => e.stopPropagation()}
+                    onFocus={(e) => e.stopPropagation()}
+                    control={
+                      <Switch
+                        size="small"
+                        checked={isDefault}
+                        disabled={savingDefault || !settings}
+                        onChange={(_, checked) =>
+                          void toggleDefault({ source: 'builtin', id: typeId }, checked)
+                        }
+                      />
+                    }
+                    label={
+                      <Typography variant="caption" color="text.secondary" whiteSpace="nowrap">
+                        {t('templates.setAsDefault')}
+                      </Typography>
+                    }
+                    labelPlacement="start"
+                  />
+                </Box>
+              </AccordionSummary>
+              <AccordionDetails>
                 <BulletSection title={t('templates.structure')} items={type.structure} />
                 <BulletSection title={t('templates.strengths')} items={type.strengths} />
                 <BulletSection title={t('templates.weaknesses')} items={type.weaknesses} />
-              </CardContent>
-            </Card>
+              </AccordionDetails>
+            </Accordion>
           );
         })}
       </Box>
@@ -180,6 +282,12 @@ export default function TemplatesPage() {
         previewLabel={t('cvTemplates.preview.template')}
         onDelete={(item) => setToDelete(item as ApplicationTemplate)}
         onPreview={setViewer}
+        isDefault={(item) => defaultPref.source === 'user' && defaultPref.id === item._id}
+        onDefaultChange={(item, checked) => {
+          void toggleDefault({ source: 'user', id: item._id }, checked);
+        }}
+        defaultSwitchLabel={t('templates.setAsDefault')}
+        defaultSwitchDisabled={savingDefault || !settings}
       />
 
       <Dialog open={manualOpen} onClose={() => !saving && setManualOpen(false)} fullWidth maxWidth="md">

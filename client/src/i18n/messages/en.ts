@@ -280,11 +280,12 @@ export const en: Messages = {
     },
     generateDialog: {
       title: 'Generate application',
-      help: 'Choose a CV and one application template (application type or your own template). Leave fields empty for automatic selection.',
+      help: 'Choose a CV and at least one application template. Each selected template generates one application.',
       cvTemplate: 'CV',
       automatic: 'Automatic selection',
       defaultSuffix: ' (default)',
-      appTemplate: 'Application template',
+      appTemplate: 'Application templates',
+      appTemplateHint: 'Select at least one template. Your default template is pre-selected.',
       builtinTypes: 'Application types',
       myTemplates: 'My templates',
       noTemplate: 'No template',
@@ -292,6 +293,7 @@ export const en: Messages = {
         'You don’t have any of your own templates yet. You can still pick an application type, or go to Templates to upload your own.',
       cancel: 'Cancel',
       generate: 'Generate',
+      generateCount: 'Generate ({{count}})',
     },
     emailDialog: {
       title: 'Send application',
@@ -462,13 +464,14 @@ export const en: Messages = {
       'Upload CVs and recommendations. Recommendations can be attached when you send an application.',
   },
   templates: {
-    title: 'Templates',
+    title: 'Application templates',
     subtitle:
-      'Browse the built-in application types, or upload your own templates for the AI to base cover letters on.',
-    builtinSection: 'Application types',
+      'Browse ApplyPilot templates, or upload your own templates for the AI to base cover letters on.',
+    builtinSection: 'ApplyPilot templates',
     builtinIntro:
-      'Fixed guidelines for different ways to write an application. Pick one type when generating an application.',
+      'Learn more about the different types of applications ApplyPilot can help you draft. Choose your default with the switch on each template.',
     yourTemplatesSection: 'My templates',
+    setAsDefault: 'Set as default',
     structure: 'Structure',
     strengths: 'Strengths',
     weaknesses: 'Weaknesses',

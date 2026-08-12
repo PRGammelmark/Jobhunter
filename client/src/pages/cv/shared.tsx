@@ -11,6 +11,8 @@ import {
   DialogContent,
   DialogActions,
   IconButton,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
@@ -42,6 +44,10 @@ export function TemplateList({
   previewLabel,
   onDelete,
   onPreview,
+  isDefault,
+  onDefaultChange,
+  defaultSwitchLabel,
+  defaultSwitchDisabled,
 }: {
   items: TemplateItem[];
   loading: boolean;
@@ -49,6 +55,11 @@ export function TemplateList({
   previewLabel: string;
   onDelete: (item: TemplateItem) => void;
   onPreview: (item: TemplateItem) => void;
+  /** When set with onDefaultChange, shows a switch instead of the default chip. */
+  isDefault?: (item: TemplateItem) => boolean;
+  onDefaultChange?: (item: TemplateItem, checked: boolean) => void;
+  defaultSwitchLabel?: string;
+  defaultSwitchDisabled?: boolean;
 }) {
   const { t } = useLocale();
   if (loading) {
@@ -59,13 +70,35 @@ export function TemplateList({
   }
   return (
     <>
-      {items.map((item) => (
+      {items.map((item) => {
+        const checked = isDefault ? isDefault(item) : item.isDefault;
+        return (
         <Card key={item._id} sx={{ mb: 1.5 }}>
           <CardContent>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 1 }}>
               <Typography variant="subtitle1" fontWeight={600}>{item.name}</Typography>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                {item.isDefault && <Chip label={t('cvTemplates.default')} size="small" color="primary" />}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0 }}>
+                {onDefaultChange ? (
+                  <FormControlLabel
+                    sx={{ mr: 0.5, ml: 0 }}
+                    control={
+                      <Switch
+                        size="small"
+                        checked={checked}
+                        disabled={defaultSwitchDisabled}
+                        onChange={(_, next) => onDefaultChange(item, next)}
+                      />
+                    }
+                    label={
+                      <Typography variant="caption" color="text.secondary">
+                        {defaultSwitchLabel || t('templates.setAsDefault')}
+                      </Typography>
+                    }
+                    labelPlacement="start"
+                  />
+                ) : (
+                  checked && <Chip label={t('cvTemplates.default')} size="small" color="primary" />
+                )}
                 <IconButton
                   size="small"
                   color="error"
@@ -121,7 +154,8 @@ export function TemplateList({
             )}
           </CardContent>
         </Card>
-      ))}
+      );
+      })}
     </>
   );
 }

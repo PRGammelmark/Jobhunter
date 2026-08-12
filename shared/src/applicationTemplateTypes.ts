@@ -10,10 +10,63 @@ export const APPLICATION_TEMPLATE_TYPE_IDS = [
 
 export type ApplicationTemplateTypeId = (typeof APPLICATION_TEMPLATE_TYPE_IDS)[number];
 
+/** Product default when the tenant has no saved preference. */
+export const DEFAULT_APPLICATION_TEMPLATE_TYPE_ID: ApplicationTemplateTypeId = 'classic_targeted';
+
+/** Tenant preference: either a built-in ApplyPilot type or a user-uploaded template. */
+export type DefaultApplicationTemplatePreference = {
+  source: 'builtin' | 'user';
+  id: string;
+};
+
+export function isDefaultApplicationTemplatePreference(
+  value: unknown
+): value is DefaultApplicationTemplatePreference {
+  if (!value || typeof value !== 'object') return false;
+  const v = value as { source?: unknown; id?: unknown };
+  if (typeof v.id !== 'string' || !v.id.trim()) return false;
+  if (v.source === 'builtin') return isApplicationTemplateTypeId(v.id);
+  if (v.source === 'user') return true;
+  return false;
+}
+
+/**
+ * Resolve the tenant's default application template.
+ * Falls back to a legacy user `isDefault` template, then classic_targeted.
+ */
+export function resolveDefaultApplicationTemplate(
+  preference: DefaultApplicationTemplatePreference | null | undefined,
+  options?: {
+    /** When preference points at a missing user template, treat as unset. */
+    userTemplateExists?: (id: string) => boolean;
+    legacyUserDefaultId?: string | null;
+  }
+): DefaultApplicationTemplatePreference {
+  const pref = preference && isDefaultApplicationTemplatePreference(preference) ? preference : null;
+  if (pref?.source === 'user') {
+    if (!options?.userTemplateExists || options.userTemplateExists(pref.id)) {
+      return pref;
+    }
+  } else if (pref?.source === 'builtin') {
+    return pref;
+  }
+  if (options?.legacyUserDefaultId) {
+    return { source: 'user', id: options.legacyUserDefaultId };
+  }
+  return { source: 'builtin', id: DEFAULT_APPLICATION_TEMPLATE_TYPE_ID };
+}
+
+/** Selection key used in the generate dialog: `type:{id}` or `user:{id}`. */
+export function defaultApplicationTemplateKey(
+  preference: DefaultApplicationTemplatePreference
+): string {
+  return preference.source === 'user' ? `user:${preference.id}` : `type:${preference.id}`;
+}
+
 export interface ApplicationTemplateTypeContent {
   title: string;
-  /** Short intro shown on the Templates page and used as AI framing */
-  intro?: string;
+  /** Short intro shown on the Templates page accordion summary and used as AI framing */
+  intro: string;
   structure: string[];
   strengths: string[];
   weaknesses: string[];
@@ -28,6 +81,8 @@ export const APPLICATION_TEMPLATE_TYPES: Record<
   classic_targeted: {
     da: {
       title: 'Den klassiske, målrettede ansøgning',
+      intro:
+        'En tryg og genkendelig form, der kobler dig direkte til jobopslaget med relevante kompetencer og resultater.',
       structure: [
         'Kort indledning: hvorfor netop jobbet og virksomheden',
         'Dine 2–3 mest relevante kompetencer',
@@ -49,6 +104,8 @@ export const APPLICATION_TEMPLATE_TYPES: Record<
     },
     en: {
       title: 'The classic, targeted application',
+      intro:
+        'A safe, familiar format that connects you directly to the job posting with relevant skills and results.',
       structure: [
         'Short introduction: why this role and company',
         'Your 2–3 most relevant skills',

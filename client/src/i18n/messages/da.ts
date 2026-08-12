@@ -278,11 +278,12 @@ export const da = {
     },
     generateDialog: {
       title: 'Generér ansøgning',
-      help: 'Vælg CV og én ansøgningsskabelon (ansøgningstype eller egen skabelon). Lad felterne være tomme for automatisk valg.',
+      help: 'Vælg CV og mindst én ansøgningsskabelon. Hver valgt skabelon genererer én ansøgning.',
       cvTemplate: 'CV',
       automatic: 'Automatisk valg',
-      defaultSuffix: ' (default)',
-      appTemplate: 'Ansøgningsskabelon',
+      defaultSuffix: ' (standard)',
+      appTemplate: 'Ansøgningsskabeloner',
+      appTemplateHint: 'Vælg mindst én skabelon. Din standardskabelon er forhåndsvalgt.',
       builtinTypes: 'Ansøgningstyper',
       myTemplates: 'Mine skabeloner',
       noTemplate: 'Ingen skabelon',
@@ -290,6 +291,7 @@ export const da = {
         'Du har ingen egne skabeloner endnu. Du kan stadig vælge en ansøgningstype, eller gå til Skabeloner for at uploade dine egne.',
       cancel: 'Annuller',
       generate: 'Generér',
+      generateCount: 'Generér ({{count}})',
     },
     emailDialog: {
       title: 'Send ansøgning',
@@ -460,13 +462,14 @@ export const da = {
       'Upload CV\'er og anbefalinger. Anbefalinger kan vedhæftes, når du sender en ansøgning.',
   },
   templates: {
-    title: 'Skabeloner',
+    title: 'Ansøgningsskabeloner',
     subtitle:
-      'Se systemets ansøgningstyper, eller upload dine egne skabeloner som AI kan tage udgangspunkt i.',
-    builtinSection: 'Ansøgningstyper',
+      'Se ApplyPilot-skabeloner, eller upload dine egne skabeloner som AI kan tage udgangspunkt i.',
+    builtinSection: 'ApplyPilot-skabeloner',
     builtinIntro:
-      'Faste retningslinjer for forskellige måder at skrive en ansøgning på. Vælg én type, når du genererer en ansøgning.',
+      'Se mere om de forskellige typer af ansøgninger, ApplyPilot kan hjælpe dig med udkast til. Vælg din standardskabelon med kontakten på hver skabelon.',
     yourTemplatesSection: 'Mine skabeloner',
+    setAsDefault: 'Vælg som standard',
     structure: 'Struktur',
     strengths: 'Styrker',
     weaknesses: 'Svagheder',

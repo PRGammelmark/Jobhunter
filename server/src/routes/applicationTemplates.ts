@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import multer from 'multer';
-import { ApplicationTemplate } from '../models';
+import { DEFAULT_APPLICATION_TEMPLATE_TYPE_ID } from '@career-intelligence/shared';
+import { ApplicationTemplate, Settings } from '../models';
 import { requireAuth } from '../middleware/auth';
 import { storageService } from '../services/storage/storageService';
 
@@ -104,6 +105,25 @@ router.delete('/:id', async (req, res) => {
     await storageService.deleteForTenant(template.originalFile.fileId.toString(), tenantId);
   } else if (template.originalFile?.storageKey) {
     await storageService.deleteByKey(template.originalFile.storageKey, tenantId);
+  }
+
+  // If this template was the tenant default, fall back to classic_targeted
+  const settings = await Settings.findOne({ tenantId });
+  const pref = settings?.preferences?.defaultApplicationTemplate as
+    | { source?: string; id?: string }
+    | undefined;
+  if (pref?.source === 'user' && pref.id === template._id.toString()) {
+    await Settings.updateOne(
+      { tenantId },
+      {
+        $set: {
+          'preferences.defaultApplicationTemplate': {
+            source: 'builtin',
+            id: DEFAULT_APPLICATION_TEMPLATE_TYPE_ID,
+          },
+        },
+      }
+    );
   }
 
   res.json({ success: true });

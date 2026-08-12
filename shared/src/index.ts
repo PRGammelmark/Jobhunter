@@ -1,4 +1,7 @@
-import type { ApplicationTemplateTypeId } from './applicationTemplateTypes';
+import type {
+  ApplicationTemplateTypeId,
+  DefaultApplicationTemplatePreference,
+} from './applicationTemplateTypes';
 
 export type ApplicationStatus =
   | 'not_started'
@@ -467,6 +470,8 @@ export interface Settings {
   preferences: {
     defaultLanguage: 'da' | 'en';
     aiModel: string;
+    /** Default cover-letter template: built-in type or user template. Unset → classic_targeted. */
+    defaultApplicationTemplate?: DefaultApplicationTemplatePreference;
   };
   /**
    * Optional override of the cover-letter generation instructions.
@@ -491,11 +496,16 @@ export {
 export {
   APPLICATION_TEMPLATE_TYPE_IDS,
   APPLICATION_TEMPLATE_TYPES,
+  DEFAULT_APPLICATION_TEMPLATE_TYPE_ID,
+  defaultApplicationTemplateKey,
   formatApplicationTemplateTypeForPrompt,
   getApplicationTemplateType,
   isApplicationTemplateTypeId,
+  isDefaultApplicationTemplatePreference,
+  resolveDefaultApplicationTemplate,
   type ApplicationTemplateTypeContent,
   type ApplicationTemplateTypeId,
+  type DefaultApplicationTemplatePreference,
 } from './applicationTemplateTypes';
 
 export type DashboardAttentionReason =

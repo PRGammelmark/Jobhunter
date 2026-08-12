@@ -114,6 +114,11 @@ const settingsSchema = new Schema({
   preferences: {
     defaultLanguage: { type: String, default: 'da' },
     aiModel: { type: String, default: 'gpt-4o-mini' },
+    defaultApplicationTemplate: {
+      _id: false,
+      source: { type: String, enum: ['builtin', 'user'] },
+      id: { type: String },
+    },
   },
   /** Optional override of cover-letter generation instructions. */
   coverLetterPrompt: { type: String, default: '' },

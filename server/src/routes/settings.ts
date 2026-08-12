@@ -3,10 +3,11 @@ import {
   ABOUT_ME_MAX_WORDS,
   countWords,
   isAiModelId,
+  isDefaultApplicationTemplatePreference,
   normalizeCoverLetterPrompt,
   sanitizeCoverLetterPrompt,
 } from '@career-intelligence/shared';
-import { Settings } from '../models';
+import { ApplicationTemplate, Settings } from '../models';
 import { config } from '../config';
 import { requireAuth } from '../middleware/auth';
 import { createOAuthState, consumeOAuthState } from '../services/auth/oauthState';
@@ -102,7 +103,11 @@ router.put('/', async (req, res) => {
       });
     }
   }
-  const preferences = update.preferences as { aiModel?: string; defaultLanguage?: string } | undefined;
+  const preferences = update.preferences as {
+    aiModel?: string;
+    defaultLanguage?: string;
+    defaultApplicationTemplate?: unknown;
+  } | undefined;
   if (preferences?.aiModel != null && !isAiModelId(preferences.aiModel)) {
     return res.status(400).json({ error: `Ukendt AI-model: ${preferences.aiModel}` });
   }
@@ -112,6 +117,20 @@ router.put('/', async (req, res) => {
     preferences.defaultLanguage !== 'en'
   ) {
     return res.status(400).json({ error: `Ukendt sprog: ${preferences.defaultLanguage}` });
+  }
+  if (preferences && 'defaultApplicationTemplate' in preferences) {
+    const pref = preferences.defaultApplicationTemplate;
+    if (pref != null) {
+      if (!isDefaultApplicationTemplatePreference(pref)) {
+        return res.status(400).json({ error: 'Ugyldig standard-ansøgningsskabelon' });
+      }
+      if (pref.source === 'user') {
+        const exists = await ApplicationTemplate.findOne({ _id: pref.id, tenantId }).select('_id');
+        if (!exists) {
+          return res.status(400).json({ error: 'Ansøgningsskabelon ikke fundet' });
+        }
+      }
+    }
   }
   if ('coverLetterPrompt' in update) {
     const sanitized = sanitizeCoverLetterPrompt(update.coverLetterPrompt);
@@ -126,6 +145,21 @@ router.put('/', async (req, res) => {
     { $set: update, $unset: { aiPrompts: 1 } },
     { upsert: true, new: true }
   );
+
+  // Keep legacy ApplicationTemplate.isDefault in sync for chips / older clients
+  const savedPref = settings?.preferences?.defaultApplicationTemplate as
+    | { source?: string; id?: string }
+    | undefined;
+  if (savedPref?.source === 'user' && savedPref.id) {
+    await ApplicationTemplate.updateMany({ tenantId }, { isDefault: false });
+    await ApplicationTemplate.updateOne(
+      { _id: savedPref.id, tenantId },
+      { isDefault: true }
+    );
+  } else if (savedPref?.source === 'builtin' || preferences?.defaultApplicationTemplate === null) {
+    await ApplicationTemplate.updateMany({ tenantId }, { isDefault: false });
+  }
+
   res.json(sanitizeSettings(settings!.toObject()));
 });
 

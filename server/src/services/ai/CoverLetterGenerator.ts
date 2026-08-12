@@ -7,12 +7,16 @@ import { renderCoverLetterPrompt } from './promptResolver';
 import {
   composeAiPrompt,
   formatApplicationTemplateTypeForPrompt,
+  getApplicationTemplateType,
   isAiModelId,
   isAppLanguage,
   isApplicationTemplateTypeId,
   normalizeSkillConfidence,
+  DEFAULT_APPLICATION_TEMPLATE_TYPE_ID,
+  resolveDefaultApplicationTemplate,
   type AppLanguage,
   type ApplicationTemplateTypeId,
+  type DefaultApplicationTemplatePreference,
 } from '@career-intelligence/shared';
 
 const COVER_LETTER_REVISE_INSTRUCTIONS_DA = `Opdater den følgende ansøgning på dansk ud fra brugerens ønskede ændringer.
@@ -100,7 +104,11 @@ export class CoverLetterGenerator {
     const settings = await Settings.findOne({ tenantId }).lean() as {
       profile?: { name?: string };
       aboutMe?: string;
-      preferences?: { aiModel?: string; defaultLanguage?: string };
+      preferences?: {
+        aiModel?: string;
+        defaultLanguage?: string;
+        defaultApplicationTemplate?: DefaultApplicationTemplatePreference;
+      };
       coverLetterPrompt?: string;
       aiPrompts?: { coverLetterGenerate?: string };
     } | null;
@@ -160,8 +168,31 @@ export class CoverLetterGenerator {
     }
 
     if (!applicationTemplateId && !applicationTemplateTypeId) {
-      const defaultAppTemplate = await ApplicationTemplate.findOne({ tenantId, isDefault: true });
-      if (defaultAppTemplate) applicationTemplateId = defaultAppTemplate._id.toString();
+      const legacyDefault = await ApplicationTemplate.findOne({ tenantId, isDefault: true })
+        .select('_id')
+        .lean();
+      let resolved = resolveDefaultApplicationTemplate(
+        settings?.preferences?.defaultApplicationTemplate,
+        { legacyUserDefaultId: legacyDefault?._id?.toString() || null }
+      );
+      if (resolved.source === 'user') {
+        const exists = await ApplicationTemplate.exists({ _id: resolved.id, tenantId });
+        if (exists) {
+          applicationTemplateId = resolved.id;
+        } else {
+          resolved = {
+            source: 'builtin',
+            id: DEFAULT_APPLICATION_TEMPLATE_TYPE_ID,
+          };
+        }
+      }
+      if (!applicationTemplateId) {
+        applicationTemplateTypeId = (
+          resolved.source === 'builtin' && isApplicationTemplateTypeId(resolved.id)
+            ? resolved.id
+            : DEFAULT_APPLICATION_TEMPLATE_TYPE_ID
+        ) as ApplicationTemplateTypeId;
+      }
     }
 
     let cvTemplateText = '';
@@ -178,15 +209,20 @@ export class CoverLetterGenerator {
     }
 
     let applicationTemplateText = '';
+    let applicationTemplateLabel = '';
     if (applicationTemplateTypeId) {
       applicationTemplateText = formatApplicationTemplateTypeForPrompt(
         applicationTemplateTypeId,
         language
       );
+      applicationTemplateLabel = getApplicationTemplateType(applicationTemplateTypeId, language).title;
     } else if (applicationTemplateId) {
       const appTemplate = await ApplicationTemplate.findOne({ _id: applicationTemplateId, tenantId });
       if (appTemplate?.parsedContent?.rawText) {
         applicationTemplateText = appTemplate.parsedContent.rawText;
+      }
+      if (appTemplate?.name) {
+        applicationTemplateLabel = appTemplate.name;
       }
       await ApplicationTemplate.findOneAndUpdate(
         { _id: applicationTemplateId, tenantId },
@@ -291,7 +327,7 @@ export class CoverLetterGenerator {
       tenantId,
       applicationId,
       version,
-      label: `Version ${version}`,
+      label: applicationTemplateLabel || `Version ${version}`,
       source: openai ? 'ai_generated' : 'manual_edit',
       cv: {
         content: '',

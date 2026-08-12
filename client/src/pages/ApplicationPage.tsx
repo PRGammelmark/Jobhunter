@@ -31,7 +31,6 @@ import {
   Link,
   IconButton,
   Menu,
-  ListSubheader,
   Skeleton,
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -49,7 +48,9 @@ import { ScrollableFadeTabs } from '../components/ScrollableFadeTabs';
 import { PageHeader } from '../ui';
 import {
   APPLICATION_TEMPLATE_TYPE_IDS,
+  defaultApplicationTemplateKey,
   getApplicationTemplateType,
+  resolveDefaultApplicationTemplate,
   type ApplicationStatus,
   type ApplicationTemplateTypeId,
   type DocumentSet,
@@ -77,6 +78,7 @@ import {
   useReviseDocuments,
   useSaveDocument,
   useSendEmail,
+  useSettings,
   useUpdateApplicationStatus,
   useUpdateApplicationWishlist,
 } from '../queries';
@@ -90,6 +92,7 @@ export default function ApplicationPage() {
   const { data: company } = useCompany(app?.companyId);
   const { data: cvTemplates = [] } = useCvTemplates();
   const { data: appTemplates = [] } = useApplicationTemplates();
+  const { data: settings } = useSettings();
   const { data: recommendations = [] } = useRecommendations();
 
   const analyzeMutation = useAnalyzeApplication();
@@ -128,10 +131,8 @@ export default function ApplicationPage() {
   const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null);
   const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<string[]>([]);
   const [selectedCvTemplateId, setSelectedCvTemplateId] = useState('');
-  const [selectedAppTemplateId, setSelectedAppTemplateId] = useState('');
-  const [selectedAppTemplateTypeId, setSelectedAppTemplateTypeId] = useState<
-    ApplicationTemplateTypeId | ''
-  >('');
+  /** Keys like `type:{id}` or `user:{id}` — one generation per selected template. */
+  const [selectedAppTemplateKeys, setSelectedAppTemplateKeys] = useState<string[]>([]);
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [reviseDocId, setReviseDocId] = useState<string | null>(null);
@@ -173,19 +174,31 @@ export default function ApplicationPage() {
     }
   };
 
+  const defaultAppTemplateKey = defaultApplicationTemplateKey(
+    resolveDefaultApplicationTemplate(settings?.preferences?.defaultApplicationTemplate, {
+      legacyUserDefaultId: appTemplates.find((a) => a.isDefault)?._id || null,
+      userTemplateExists: (id) => appTemplates.some((a) => a._id === id),
+    })
+  );
+
   const runGenerate = async () => {
+    if (selectedAppTemplateKeys.length === 0) return;
     setActionLoading('generate');
     try {
-      await generateMutation.mutateAsync({
-        id: app._id,
-        options: {
-          cvTemplateId: selectedCvTemplateId || undefined,
-          applicationTemplateId: selectedAppTemplateTypeId
-            ? undefined
-            : selectedAppTemplateId || undefined,
-          applicationTemplateTypeId: selectedAppTemplateTypeId || undefined,
-        },
-      });
+      for (const key of selectedAppTemplateKeys) {
+        const isType = key.startsWith('type:');
+        const isUser = key.startsWith('user:');
+        await generateMutation.mutateAsync({
+          id: app._id,
+          options: {
+            cvTemplateId: selectedCvTemplateId || undefined,
+            applicationTemplateId: isUser ? key.slice(5) : undefined,
+            applicationTemplateTypeId: isType
+              ? (key.slice(5) as ApplicationTemplateTypeId)
+              : undefined,
+          },
+        });
+      }
       setGenerateDialog(false);
       setTab(1);
     } finally {
@@ -195,32 +208,15 @@ export default function ApplicationPage() {
 
   const openGenerateDialog = () => {
     const defaultCv = cvTemplates.find((c) => c.isDefault);
-    const defaultApp = appTemplates.find((a) => a.isDefault);
     setSelectedCvTemplateId(defaultCv?._id || '');
-    setSelectedAppTemplateId(defaultApp?._id || '');
-    setSelectedAppTemplateTypeId('');
+    setSelectedAppTemplateKeys([defaultAppTemplateKey]);
     setGenerateDialog(true);
   };
 
-  const appTemplateSelectValue = selectedAppTemplateTypeId
-    ? `type:${selectedAppTemplateTypeId}`
-    : selectedAppTemplateId
-      ? `user:${selectedAppTemplateId}`
-      : '';
-
-  const onAppTemplateSelect = (value: string) => {
-    if (value.startsWith('type:')) {
-      setSelectedAppTemplateTypeId(value.slice(5) as ApplicationTemplateTypeId);
-      setSelectedAppTemplateId('');
-      return;
-    }
-    if (value.startsWith('user:')) {
-      setSelectedAppTemplateId(value.slice(5));
-      setSelectedAppTemplateTypeId('');
-      return;
-    }
-    setSelectedAppTemplateId('');
-    setSelectedAppTemplateTypeId('');
+  const toggleAppTemplateKey = (key: string) => {
+    setSelectedAppTemplateKeys((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
   };
 
   const toggleWishlist = () => {
@@ -1038,31 +1034,72 @@ export default function ApplicationPage() {
               ))}
             </Select>
           </FormControl>
-          <FormControl fullWidth>
-            <InputLabel>{t('application.generateDialog.appTemplate')}</InputLabel>
-            <Select
-              value={appTemplateSelectValue}
-              label={t('application.generateDialog.appTemplate')}
-              onChange={(e) => onAppTemplateSelect(e.target.value)}
-            >
-              <MenuItem value="">{t('application.generateDialog.noTemplate')}</MenuItem>
-              <ListSubheader>{t('application.generateDialog.builtinTypes')}</ListSubheader>
-              {APPLICATION_TEMPLATE_TYPE_IDS.map((typeId) => (
-                <MenuItem key={typeId} value={`type:${typeId}`}>
-                  {getApplicationTemplateType(typeId, locale).title}
-                </MenuItem>
-              ))}
+          <Box>
+            <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+              {t('application.generateDialog.appTemplate')}
+            </Typography>
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+              {t('application.generateDialog.appTemplateHint')}
+            </Typography>
+            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, mb: 0.5 }}>
+                {t('application.generateDialog.builtinTypes')}
+              </Typography>
+              {APPLICATION_TEMPLATE_TYPE_IDS.map((typeId) => {
+                const key = `type:${typeId}`;
+                return (
+                  <FormControlLabel
+                    key={typeId}
+                    control={
+                      <Checkbox
+                        checked={selectedAppTemplateKeys.includes(key)}
+                        onChange={() => toggleAppTemplateKey(key)}
+                        size="small"
+                      />
+                    }
+                    label={
+                      <Typography variant="body2">
+                        {getApplicationTemplateType(typeId, locale).title}
+                        {key === defaultAppTemplateKey
+                          ? t('application.generateDialog.defaultSuffix')
+                          : ''}
+                      </Typography>
+                    }
+                  />
+                );
+              })}
               {appTemplates.length > 0 && (
-                <ListSubheader>{t('application.generateDialog.myTemplates')}</ListSubheader>
+                <>
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 1, mb: 0.5 }}>
+                    {t('application.generateDialog.myTemplates')}
+                  </Typography>
+                  {appTemplates.map((template) => {
+                    const key = `user:${template._id}`;
+                    return (
+                      <FormControlLabel
+                        key={template._id}
+                        control={
+                          <Checkbox
+                            checked={selectedAppTemplateKeys.includes(key)}
+                            onChange={() => toggleAppTemplateKey(key)}
+                            size="small"
+                          />
+                        }
+                        label={
+                          <Typography variant="body2">
+                            {template.name}
+                            {key === defaultAppTemplateKey
+                              ? t('application.generateDialog.defaultSuffix')
+                              : ''}
+                          </Typography>
+                        }
+                      />
+                    );
+                  })}
+                </>
               )}
-              {appTemplates.map((template) => (
-                <MenuItem key={template._id} value={`user:${template._id}`}>
-                  {template.name}
-                  {template.isDefault ? t('application.generateDialog.defaultSuffix') : ''}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+            </Box>
+          </Box>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setGenerateDialog(false)} disabled={actionLoading === 'generate'}>
@@ -1071,10 +1108,14 @@ export default function ApplicationPage() {
           <Button
             variant="contained"
             onClick={runGenerate}
-            disabled={actionLoading === 'generate'}
+            disabled={actionLoading === 'generate' || selectedAppTemplateKeys.length === 0}
             startIcon={actionLoading === 'generate' ? <CircularProgress size={16} /> : undefined}
           >
-            {t('application.generateDialog.generate')}
+            {selectedAppTemplateKeys.length > 1
+              ? t('application.generateDialog.generateCount', {
+                  count: selectedAppTemplateKeys.length,
+                })
+              : t('application.generateDialog.generate')}
           </Button>
         </DialogActions>
       </Dialog>
