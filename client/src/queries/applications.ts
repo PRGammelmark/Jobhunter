@@ -154,7 +154,11 @@ export function useGenerateDocuments() {
       options,
     }: {
       id: string;
-      options?: { cvTemplateId?: string; applicationTemplateId?: string };
+      options?: {
+        cvTemplateId?: string;
+        applicationTemplateId?: string;
+        applicationTemplateTypeId?: string;
+      };
     }) => api.generateDocuments(id, options),
     onSuccess: ({ application }, { id }) => {
       upsertApplicationCache(queryClient, application);

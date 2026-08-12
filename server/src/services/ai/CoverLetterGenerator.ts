@@ -6,10 +6,13 @@ import { cvSelector } from './CvSelector';
 import { renderCoverLetterPrompt } from './promptResolver';
 import {
   composeAiPrompt,
+  formatApplicationTemplateTypeForPrompt,
   isAiModelId,
   isAppLanguage,
+  isApplicationTemplateTypeId,
   normalizeSkillConfidence,
   type AppLanguage,
+  type ApplicationTemplateTypeId,
 } from '@career-intelligence/shared';
 
 const COVER_LETTER_REVISE_INSTRUCTIONS_DA = `Opdater den følgende ansøgning på dansk ud fra brugerens ønskede ændringer.
@@ -44,6 +47,7 @@ export interface GenerateOptions {
   tenantId: Types.ObjectId | string;
   cvTemplateId?: string;
   applicationTemplateId?: string;
+  applicationTemplateTypeId?: ApplicationTemplateTypeId;
 }
 
 export interface ReviseOptions {
@@ -145,7 +149,17 @@ export class CoverLetterGenerator {
     }
 
     let applicationTemplateId = options.applicationTemplateId;
-    if (!applicationTemplateId) {
+    let applicationTemplateTypeId = options.applicationTemplateTypeId;
+
+    if (applicationTemplateId && applicationTemplateTypeId) {
+      throw new Error('Vælg enten en ansøgningstype eller en egen skabelon — ikke begge');
+    }
+
+    if (applicationTemplateTypeId && !isApplicationTemplateTypeId(applicationTemplateTypeId)) {
+      throw new Error('Ukendt ansøgningstype');
+    }
+
+    if (!applicationTemplateId && !applicationTemplateTypeId) {
       const defaultAppTemplate = await ApplicationTemplate.findOne({ tenantId, isDefault: true });
       if (defaultAppTemplate) applicationTemplateId = defaultAppTemplate._id.toString();
     }
@@ -164,7 +178,12 @@ export class CoverLetterGenerator {
     }
 
     let applicationTemplateText = '';
-    if (applicationTemplateId) {
+    if (applicationTemplateTypeId) {
+      applicationTemplateText = formatApplicationTemplateTypeForPrompt(
+        applicationTemplateTypeId,
+        language
+      );
+    } else if (applicationTemplateId) {
       const appTemplate = await ApplicationTemplate.findOne({ _id: applicationTemplateId, tenantId });
       if (appTemplate?.parsedContent?.rawText) {
         applicationTemplateText = appTemplate.parsedContent.rawText;
@@ -228,11 +247,13 @@ export class CoverLetterGenerator {
             ? `CV ATTACHED (context only — do not include in the response):\nName: ${cvTemplateName || 'CV'}\n${cvTemplateText}`
             : `CV DER SENDES MED (kun kontekst — medtag ikke i svaret):\nNavn: ${cvTemplateName || 'CV'}\n${cvTemplateText}`
           : '',
-        applicationTemplateText
-          ? language === 'en'
-            ? `APPLICATION TEMPLATE (use as tone, structure and style reference — adapt the content to the role and company):\n${applicationTemplateText}`
-            : `ANSØGNINGSSKABELON (brug som tone, struktur og stil-reference — tilpas indholdet til stillingen og virksomheden):\n${applicationTemplateText}`
-          : '',
+        applicationTemplateTypeId
+          ? applicationTemplateText
+          : applicationTemplateText
+            ? language === 'en'
+              ? `APPLICATION TEMPLATE (use as tone, structure and style reference — adapt the content to the role and company):\n${applicationTemplateText}`
+              : `ANSØGNINGSSKABELON (brug som tone, struktur og stil-reference — tilpas indholdet til stillingen og virksomheden):\n${applicationTemplateText}`
+            : '',
       ]
         .filter(Boolean)
         .join('\n\n');
@@ -279,7 +300,8 @@ export class CoverLetterGenerator {
       },
       coverLetter: {
         content: coverContent,
-        basedOnTemplateId: applicationTemplateId,
+        basedOnTemplateId: applicationTemplateTypeId ? undefined : applicationTemplateId,
+        basedOnTemplateType: applicationTemplateTypeId,
       },
     });
 
@@ -383,6 +405,7 @@ export class CoverLetterGenerator {
       coverLetter: {
         content: coverContent,
         basedOnTemplateId: sourceDoc.coverLetter?.basedOnTemplateId,
+        basedOnTemplateType: sourceDoc.coverLetter?.basedOnTemplateType,
       },
     });
 

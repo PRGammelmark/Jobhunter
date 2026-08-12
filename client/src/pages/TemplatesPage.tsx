@@ -7,10 +7,21 @@ import {
   DialogContent,
   DialogActions,
   TextField,
+  Typography,
+  Card,
+  CardContent,
+  List,
+  ListItem,
+  ListItemText,
+  Divider,
 } from '@mui/material';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
 import EditNoteIcon from '@mui/icons-material/EditNote';
-import type { ApplicationTemplate } from '@career-intelligence/shared';
+import {
+  APPLICATION_TEMPLATE_TYPE_IDS,
+  getApplicationTemplateType,
+  type ApplicationTemplate,
+} from '@career-intelligence/shared';
 import { useLocale } from '../i18n';
 import {
   useApplicationTemplates,
@@ -26,8 +37,28 @@ import {
   type ViewableDocument,
 } from './cv/shared';
 
+function BulletSection({ title, items }: { title: string; items: string[] }) {
+  return (
+    <Box sx={{ mt: 1.5 }}>
+      <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+        {title}
+      </Typography>
+      <List dense disablePadding>
+        {items.map((item) => (
+          <ListItem key={item} disableGutters sx={{ py: 0.25, alignItems: 'flex-start' }}>
+            <Typography component="span" sx={{ mr: 1, lineHeight: 1.5 }} color="text.secondary">
+              •
+            </Typography>
+            <ListItemText primary={item} primaryTypographyProps={{ variant: 'body2' }} />
+          </ListItem>
+        ))}
+      </List>
+    </Box>
+  );
+}
+
 export default function TemplatesPage() {
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const { data: appTemplates, isPending } = useApplicationTemplates();
   const templateList = appTemplates ?? [];
   const createTemplate = useCreateApplicationTemplate();
@@ -78,6 +109,42 @@ export default function TemplatesPage() {
   return (
     <Box>
       <PageHeader title={t('templates.title')} subtitle={t('templates.subtitle')} />
+
+      <Typography variant="h6" sx={{ mb: 1 }}>
+        {t('templates.builtinSection')}
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        {t('templates.builtinIntro')}
+      </Typography>
+
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, mb: 4 }}>
+        {APPLICATION_TEMPLATE_TYPE_IDS.map((typeId) => {
+          const type = getApplicationTemplateType(typeId, locale);
+          return (
+            <Card key={typeId} variant="outlined">
+              <CardContent>
+                <Typography variant="subtitle1" fontWeight={600}>
+                  {type.title}
+                </Typography>
+                {type.intro && (
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                    {type.intro}
+                  </Typography>
+                )}
+                <BulletSection title={t('templates.structure')} items={type.structure} />
+                <BulletSection title={t('templates.strengths')} items={type.strengths} />
+                <BulletSection title={t('templates.weaknesses')} items={type.weaknesses} />
+              </CardContent>
+            </Card>
+          );
+        })}
+      </Box>
+
+      <Divider sx={{ mb: 3 }} />
+
+      <Typography variant="h6" sx={{ mb: 2 }}>
+        {t('templates.yourTemplatesSection')}
+      </Typography>
 
       <input
         ref={appFileRef}

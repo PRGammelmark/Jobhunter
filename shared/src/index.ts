@@ -1,3 +1,5 @@
+import type { ApplicationTemplateTypeId } from './applicationTemplateTypes';
+
 export type ApplicationStatus =
   | 'not_started'
   | 'in_progress'
@@ -396,6 +398,8 @@ export interface DocumentSet {
     content: string;
     pdfFile?: DocumentPdfFile;
     basedOnTemplateId?: string;
+    /** Built-in application style type id (mutually exclusive with basedOnTemplateId) */
+    basedOnTemplateType?: ApplicationTemplateTypeId;
   };
   potentialImprovements?: string[];
   aiPromptSnapshot?: string;
@@ -483,6 +487,16 @@ export {
   sanitizeCoverLetterPrompt,
   type AppLanguage,
 } from './aiPrompts';
+
+export {
+  APPLICATION_TEMPLATE_TYPE_IDS,
+  APPLICATION_TEMPLATE_TYPES,
+  formatApplicationTemplateTypeForPrompt,
+  getApplicationTemplateType,
+  isApplicationTemplateTypeId,
+  type ApplicationTemplateTypeContent,
+  type ApplicationTemplateTypeId,
+} from './applicationTemplateTypes';
 
 export type DashboardAttentionReason =
   | 'ai_question'

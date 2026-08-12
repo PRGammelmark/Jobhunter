@@ -494,6 +494,7 @@ export interface IDocumentSet extends Document {
     content: string;
     pdfFile?: { storageKey: string; fileName: string; fileId?: Types.ObjectId };
     basedOnTemplateId?: Types.ObjectId;
+    basedOnTemplateType?: string;
   };
   potentialImprovements?: string[];
   aiPromptSnapshot?: string;
@@ -520,6 +521,7 @@ const documentSetSchema = new Schema<IDocumentSet>(
       content: { type: String, default: '' },
       pdfFile: { storageKey: String, fileName: String, fileId: Schema.Types.ObjectId },
       basedOnTemplateId: { type: Schema.Types.ObjectId, ref: 'ApplicationTemplate' },
+      basedOnTemplateType: { type: String },
     },
     potentialImprovements: [String],
     aiPromptSnapshot: String,

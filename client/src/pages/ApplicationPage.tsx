@@ -31,6 +31,7 @@ import {
   Link,
   IconButton,
   Menu,
+  ListSubheader,
   Skeleton,
 } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
@@ -47,7 +48,10 @@ import PageBreadcrumbs from '../components/layout/PageBreadcrumbs';
 import { ScrollableFadeTabs } from '../components/ScrollableFadeTabs';
 import { PageHeader } from '../ui';
 import {
+  APPLICATION_TEMPLATE_TYPE_IDS,
+  getApplicationTemplateType,
   type ApplicationStatus,
+  type ApplicationTemplateTypeId,
   type DocumentSet,
   type InterviewContext,
   type InterviewRound,
@@ -80,7 +84,7 @@ import {
 export default function ApplicationPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { t, formatDateTime } = useLocale();
+  const { t, locale, formatDateTime } = useLocale();
   const { data: app, isPending: appPending } = useApplication(id);
   const { data: documents = [] } = useDocuments(id);
   const { data: company } = useCompany(app?.companyId);
@@ -125,6 +129,9 @@ export default function ApplicationPage() {
   const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<string[]>([]);
   const [selectedCvTemplateId, setSelectedCvTemplateId] = useState('');
   const [selectedAppTemplateId, setSelectedAppTemplateId] = useState('');
+  const [selectedAppTemplateTypeId, setSelectedAppTemplateTypeId] = useState<
+    ApplicationTemplateTypeId | ''
+  >('');
   const [editingDocId, setEditingDocId] = useState<string | null>(null);
   const [editDraft, setEditDraft] = useState('');
   const [reviseDocId, setReviseDocId] = useState<string | null>(null);
@@ -173,7 +180,10 @@ export default function ApplicationPage() {
         id: app._id,
         options: {
           cvTemplateId: selectedCvTemplateId || undefined,
-          applicationTemplateId: selectedAppTemplateId || undefined,
+          applicationTemplateId: selectedAppTemplateTypeId
+            ? undefined
+            : selectedAppTemplateId || undefined,
+          applicationTemplateTypeId: selectedAppTemplateTypeId || undefined,
         },
       });
       setGenerateDialog(false);
@@ -188,7 +198,29 @@ export default function ApplicationPage() {
     const defaultApp = appTemplates.find((a) => a.isDefault);
     setSelectedCvTemplateId(defaultCv?._id || '');
     setSelectedAppTemplateId(defaultApp?._id || '');
+    setSelectedAppTemplateTypeId('');
     setGenerateDialog(true);
+  };
+
+  const appTemplateSelectValue = selectedAppTemplateTypeId
+    ? `type:${selectedAppTemplateTypeId}`
+    : selectedAppTemplateId
+      ? `user:${selectedAppTemplateId}`
+      : '';
+
+  const onAppTemplateSelect = (value: string) => {
+    if (value.startsWith('type:')) {
+      setSelectedAppTemplateTypeId(value.slice(5) as ApplicationTemplateTypeId);
+      setSelectedAppTemplateId('');
+      return;
+    }
+    if (value.startsWith('user:')) {
+      setSelectedAppTemplateId(value.slice(5));
+      setSelectedAppTemplateTypeId('');
+      return;
+    }
+    setSelectedAppTemplateId('');
+    setSelectedAppTemplateTypeId('');
   };
 
   const toggleWishlist = () => {
@@ -1009,23 +1041,28 @@ export default function ApplicationPage() {
           <FormControl fullWidth>
             <InputLabel>{t('application.generateDialog.appTemplate')}</InputLabel>
             <Select
-              value={selectedAppTemplateId}
+              value={appTemplateSelectValue}
               label={t('application.generateDialog.appTemplate')}
-              onChange={(e) => setSelectedAppTemplateId(e.target.value)}
+              onChange={(e) => onAppTemplateSelect(e.target.value)}
             >
               <MenuItem value="">{t('application.generateDialog.noTemplate')}</MenuItem>
+              <ListSubheader>{t('application.generateDialog.builtinTypes')}</ListSubheader>
+              {APPLICATION_TEMPLATE_TYPE_IDS.map((typeId) => (
+                <MenuItem key={typeId} value={`type:${typeId}`}>
+                  {getApplicationTemplateType(typeId, locale).title}
+                </MenuItem>
+              ))}
+              {appTemplates.length > 0 && (
+                <ListSubheader>{t('application.generateDialog.myTemplates')}</ListSubheader>
+              )}
               {appTemplates.map((template) => (
-                <MenuItem key={template._id} value={template._id}>
-                  {template.name}{template.isDefault ? t('application.generateDialog.defaultSuffix') : ''}
+                <MenuItem key={template._id} value={`user:${template._id}`}>
+                  {template.name}
+                  {template.isDefault ? t('application.generateDialog.defaultSuffix') : ''}
                 </MenuItem>
               ))}
             </Select>
           </FormControl>
-          {cvTemplates.length === 0 && appTemplates.length === 0 && (
-            <Alert severity="info">
-              {t('application.generateDialog.noTemplatesAlert')}
-            </Alert>
-          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setGenerateDialog(false)} disabled={actionLoading === 'generate'}>

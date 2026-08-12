@@ -278,14 +278,16 @@ export const da = {
     },
     generateDialog: {
       title: 'Generér ansøgning',
-      help: 'Vælg hvilke skabeloner AI skal tage udgangspunkt i. Lad feltet være tomt for automatisk valg.',
-      cvTemplate: 'CV-skabelon',
+      help: 'Vælg CV og én ansøgningsskabelon (ansøgningstype eller egen skabelon). Lad felterne være tomme for automatisk valg.',
+      cvTemplate: 'CV',
       automatic: 'Automatisk valg',
       defaultSuffix: ' (default)',
       appTemplate: 'Ansøgningsskabelon',
+      builtinTypes: 'Ansøgningstyper',
+      myTemplates: 'Mine skabeloner',
       noTemplate: 'Ingen skabelon',
       noTemplatesAlert:
-        'Du har ingen skabeloner endnu. Gå til Skabeloner for at uploade eller oprette dem.',
+        'Du har ingen egne skabeloner endnu. Du kan stadig vælge en ansøgningstype, eller gå til Skabeloner for at uploade dine egne.',
       cancel: 'Annuller',
       generate: 'Generér',
     },
@@ -459,7 +461,15 @@ export const da = {
   },
   templates: {
     title: 'Skabeloner',
-    subtitle: 'Upload eller opret ansøgningsskabeloner, som AI kan tage udgangspunkt i.',
+    subtitle:
+      'Se systemets ansøgningstyper, eller upload dine egne skabeloner som AI kan tage udgangspunkt i.',
+    builtinSection: 'Ansøgningstyper',
+    builtinIntro:
+      'Faste retningslinjer for forskellige måder at skrive en ansøgning på. Vælg én type, når du genererer en ansøgning.',
+    yourTemplatesSection: 'Mine skabeloner',
+    structure: 'Struktur',
+    strengths: 'Styrker',
+    weaknesses: 'Svagheder',
   },
   cvTemplates: {
     tabs: {

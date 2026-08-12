@@ -280,14 +280,16 @@ export const en: Messages = {
     },
     generateDialog: {
       title: 'Generate application',
-      help: 'Choose which templates the AI should base this on. Leave empty for automatic selection.',
-      cvTemplate: 'CV template',
+      help: 'Choose a CV and one application template (application type or your own template). Leave fields empty for automatic selection.',
+      cvTemplate: 'CV',
       automatic: 'Automatic selection',
       defaultSuffix: ' (default)',
       appTemplate: 'Application template',
+      builtinTypes: 'Application types',
+      myTemplates: 'My templates',
       noTemplate: 'No template',
       noTemplatesAlert:
-        'You don’t have any templates yet. Go to Templates to upload or create them.',
+        'You don’t have any of your own templates yet. You can still pick an application type, or go to Templates to upload your own.',
       cancel: 'Cancel',
       generate: 'Generate',
     },
@@ -461,7 +463,15 @@ export const en: Messages = {
   },
   templates: {
     title: 'Templates',
-    subtitle: 'Upload or create application templates for the AI to base cover letters on.',
+    subtitle:
+      'Browse the built-in application types, or upload your own templates for the AI to base cover letters on.',
+    builtinSection: 'Application types',
+    builtinIntro:
+      'Fixed guidelines for different ways to write an application. Pick one type when generating an application.',
+    yourTemplatesSection: 'My templates',
+    structure: 'Structure',
+    strengths: 'Strengths',
+    weaknesses: 'Weaknesses',
   },
   cvTemplates: {
     tabs: {

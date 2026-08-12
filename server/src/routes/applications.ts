@@ -15,6 +15,7 @@ import { exportDocumentSetPdfs } from '../services/pdf/documentExportService';
 import { sendEmail } from '../services/mail/mailService';
 import { storageService } from '../services/storage/storageService';
 import type { ApplicationStatus, InterviewContext } from '@career-intelligence/shared';
+import { isApplicationTemplateTypeId } from '@career-intelligence/shared';
 
 const router = Router();
 
@@ -291,14 +292,30 @@ router.post('/:id/answer-questions', async (req, res) => {
 router.post('/:id/generate', async (req, res) => {
   try {
     const tenantId = req.user!.tenantId;
-    const { cvTemplateId, applicationTemplateId } = req.body as {
+    const { cvTemplateId, applicationTemplateId, applicationTemplateTypeId } = req.body as {
       cvTemplateId?: string;
       applicationTemplateId?: string;
+      applicationTemplateTypeId?: string;
     };
+    if (applicationTemplateId && applicationTemplateTypeId) {
+      return res.status(400).json({
+        error: 'Vælg enten en ansøgningstype eller en egen skabelon — ikke begge',
+      });
+    }
+    if (
+      applicationTemplateTypeId != null &&
+      applicationTemplateTypeId !== '' &&
+      !isApplicationTemplateTypeId(applicationTemplateTypeId)
+    ) {
+      return res.status(400).json({ error: 'Ukendt ansøgningstype' });
+    }
     const result = await coverLetterGenerator.generate(req.params.id, {
       tenantId,
       cvTemplateId,
       applicationTemplateId,
+      applicationTemplateTypeId: isApplicationTemplateTypeId(applicationTemplateTypeId)
+        ? applicationTemplateTypeId
+        : undefined,
     });
     const application = await Application.findOneAndUpdate(
       { _id: req.params.id, tenantId },
@@ -385,6 +402,8 @@ router.post('/:id/documents', async (req, res) => {
       content: coverContent,
       basedOnTemplateId:
         req.body.coverLetter?.basedOnTemplateId ?? baseDoc?.coverLetter?.basedOnTemplateId,
+      basedOnTemplateType:
+        req.body.coverLetter?.basedOnTemplateType ?? baseDoc?.coverLetter?.basedOnTemplateType,
     },
     label: req.body.label || `Version ${version}`,
   });

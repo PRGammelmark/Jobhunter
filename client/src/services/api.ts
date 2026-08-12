@@ -128,7 +128,11 @@ export const api = {
     }),
   generateDocuments: (
     id: string,
-    options?: { cvTemplateId?: string; applicationTemplateId?: string }
+    options?: {
+      cvTemplateId?: string;
+      applicationTemplateId?: string;
+      applicationTemplateTypeId?: string;
+    }
   ) =>
     request<{ application: Application; documentSet: DocumentSet }>(
       `/applications/${id}/generate`,
