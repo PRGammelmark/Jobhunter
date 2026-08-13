@@ -190,6 +190,14 @@ export default function TemplatesPage() {
                 expandIcon={<ExpandMoreIcon />}
                 aria-controls={`${typeId}-content`}
                 id={`${typeId}-header`}
+                sx={{
+                  alignItems: 'flex-start',
+                  '& .MuiAccordionSummary-expandIconWrapper': {
+                    mt: 1.5,
+                    height: 26,
+                    alignItems: 'center',
+                  },
+                }}
               >
                 <Box
                   sx={{
